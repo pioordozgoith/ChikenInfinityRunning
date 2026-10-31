@@ -4,6 +4,8 @@
 
 Chicken Infinity Running é um jogo de corrida infinita em estilo retrô, desenvolvido em JavaScript puro com HTML5 Canvas. O jogador controla uma galinha que corre por um cenário arcade 1-bit, desviando de obstáculos e coletando ovos.
 
+![Imagem de referência do Chicken Infinity Running](Ref/RefImage.png)
+
 ## Recursos
 
 - Cinco personagens jogáveis

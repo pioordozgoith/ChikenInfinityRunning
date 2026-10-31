@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pi Runner — 1-Bit Infinity Running Game</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-mono bezel-on">
+<div id="console-chassis">
+  <!-- Console Bezel Header -->
+  <header id="console-header">
+    <div class="brand-group">
+      <div class="power-led" title="Power ON"></div>
+      <span class="brand-label">PI-BOT // 1-BIT SYSTEM</span>
+    </div>
+    <div class="toolbar-actions">
+      <button id="btn-roster" class="bezel-btn" title="Choose Chicken (C)">🐔 CHICKEN</button>
+      <button id="btn-theme" class="bezel-btn" title="Cycle 1-Bit Themes (T)">🎨 THEME</button>
+      <button id="btn-audio" class="bezel-btn" title="Cycle Audio Modes (M)">🔊 ALL</button>
+      <button id="btn-bezel" class="bezel-btn" title="Toggle Bezel (B)">📟 BEZEL</button>
+      <button id="btn-fullscreen" class="bezel-btn" title="Toggle Fullscreen (F)">⛶ FULL</button>
+    </div>
+  </header>
+
+  <!-- Screen Enclosure -->
+  <div id="screen-enclosure">
+    <div id="screen-glare"></div>
+    <canvas id="game" width="960" height="280"></canvas>
+    <div id="toast" class="toast-hidden"></div>
+  </div>
+
+  <!-- Mobile / Virtual Touch Controls -->
+  <div id="touch-controls" class="touch-bar">
+    <button id="btn-touch-slide" class="touch-btn btn-slide" aria-label="Slide / Duck">
+      <span class="touch-icon">▼</span>
+      <span class="touch-text">SLIDE</span>
+    </button>
+    <div class="console-grille">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <button id="btn-touch-jump" class="touch-btn btn-jump" aria-label="Jump">
+      <span class="touch-icon">▲</span>
+      <span class="touch-text">JUMP</span>
+    </button>
+  </div>
+</div>
+
+<footer id="console-footer">
+  <span>[SPACE / UP / RIGHT TAP] JUMP</span>
+  <span class="sep">·</span>
+  <span>[DOWN / S / LEFT TAP] SLIDE</span>
+  <span class="sep">·</span>
+  <span>[C] CHICKEN</span>
+  <span class="sep">·</span>
+  <span>[P] PAUSE</span>
+  <span class="sep">·</span>
+  <span>[M] AUDIO</span>
+  <span class="sep">·</span>
+  <span>[T] THEME</span>
+</footer>
+
+<script src="js/game.js"></script>
+</body>
+</html>

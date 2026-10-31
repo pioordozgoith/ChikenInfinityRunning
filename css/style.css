@@ -1,0 +1,362 @@
+/* Pi Runner — 1-Bit Vintage Theme & Console Frame */
+:root {
+  --bg: #000000;
+  --fg: #ffffff;
+  --chassis: #161616;
+  --chassis-border: #333333;
+  --chassis-inset: #0a0a0a;
+  --accent: #ffffff;
+  --led: #ff3333;
+}
+
+body.theme-mono {
+  --bg: #000000;
+  --fg: #ffffff;
+  --chassis: #151515;
+  --chassis-border: #3a3a3a;
+  --chassis-inset: #050505;
+  --accent: #ffffff;
+  --led: #ff2222;
+}
+
+body.theme-gameboy {
+  --bg: #0f380f;
+  --fg: #8bac0f;
+  --chassis: #1e3f1e;
+  --chassis-border: #355f35;
+  --chassis-inset: #092409;
+  --accent: #8bac0f;
+  --led: #8bac0f;
+}
+
+body.theme-amber {
+  --bg: #140700;
+  --fg: #ffb000;
+  --chassis: #221004;
+  --chassis-border: #4a2408;
+  --chassis-inset: #0a0400;
+  --accent: #ffb000;
+  --led: #ff8800;
+}
+
+body.theme-macintosh {
+  --bg: #1a1a1a;
+  --fg: #f5f5f0;
+  --chassis: #2e2e2e;
+  --chassis-border: #505050;
+  --chassis-inset: #121212;
+  --accent: #f5f5f0;
+  --led: #00ff66;
+}
+
+body.theme-cyber {
+  --bg: #040910;
+  --fg: #00ffcc;
+  --chassis: #0b1a28;
+  --chassis-border: #1b3d5c;
+  --chassis-inset: #020508;
+  --accent: #00ffcc;
+  --led: #00ffcc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, 'Courier New', Menlo, Consolas, monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* =========================================
+   Console Chassis / Handheld Frame
+   ========================================= */
+#console-chassis {
+  width: min(100%, 1100px);
+  display: flex;
+  flex-direction: column;
+  transition: background 0.25s ease, border-color 0.25s ease, border-width 0.25s ease, padding 0.25s ease;
+  position: relative;
+}
+
+body.bezel-on #console-chassis {
+  background: var(--chassis);
+  border: 4px solid var(--chassis-border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Outer drop shadow lives on its own painter (::before) so the game canvas's
+   per-frame repaints never re-run the 40px blur raster. */
+body.bezel-on #console-chassis::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  z-index: -1;
+  pointer-events: none;
+}
+
+body:not(.bezel-on) #console-header,
+body:not(.bezel-on) .console-grille {
+  display: none;
+}
+
+/* Console Header */
+#console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 4px;
+  border-bottom: 2px solid var(--chassis-border);
+  padding-bottom: 10px;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.power-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--led);
+  box-shadow: 0 0 8px var(--led);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+}
+
+.brand-label {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--fg);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* 1-Bit Pixel Styled Bezel Buttons */
+.bezel-btn {
+  background: var(--chassis-inset);
+  color: var(--fg);
+  border: 2px solid var(--chassis-border);
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  outline: none;
+  border-radius: 4px;
+  box-shadow: 0 2px 0 var(--chassis-border);
+  transition: all 0.1s ease;
+  image-rendering: pixelated;
+}
+
+.bezel-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.bezel-btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+/* Screen Enclosure */
+#screen-enclosure {
+  position: relative;
+  background: var(--chassis-inset);
+  border: 4px solid var(--chassis-border);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 6px 12px rgba(0, 0, 0, 0.7);
+}
+
+canvas#game {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #ffffff;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+
+/* Toast Notification (Achievement & Clipboard Popup) */
+#toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.toast-hidden {
+  opacity: 0;
+  transform: translate(-50%, -20px) !important;
+}
+
+/* =========================================
+   Mobile / Virtual Touch Controls
+   ========================================= */
+.touch-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  gap: 16px;
+}
+
+.touch-btn {
+  flex: 1;
+  max-width: 220px;
+  height: 64px;
+  background: var(--chassis-inset);
+  color: var(--fg);
+  border: 3px solid var(--chassis-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  box-shadow: 0 4px 0 var(--chassis-border);
+  transition: all 0.08s ease;
+}
+
+.touch-btn:hover {
+  border-color: var(--fg);
+}
+
+.touch-btn:active,
+.touch-btn.active {
+  background: var(--fg);
+  color: var(--bg);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--chassis-border);
+}
+
+.touch-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.touch-text {
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.console-grille {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.console-grille span {
+  width: 5px;
+  height: 28px;
+  background: var(--chassis-border);
+  border-radius: 2px;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Footer Keyboard Shortcuts */
+#console-footer {
+  margin-top: 14px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-align: center;
+  color: var(--fg);
+  opacity: 0.75;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sep {
+  opacity: 0.4;
+}
+
+/* =========================================
+   Responsive Adjustments
+   ========================================= */
+@media (max-width: 680px) {
+  body {
+    padding: 6px;
+    justify-content: flex-start;
+  }
+  
+  body.bezel-on #console-chassis {
+    padding: 10px;
+    border-width: 2px;
+  }
+  
+  .touch-bar {
+    margin-top: 10px;
+  }
+
+  .touch-btn {
+    height: 56px;
+  }
+  
+  .brand-label {
+    font-size: 11px;
+  }
+  
+  .bezel-btn {
+    font-size: 9px;
+    padding: 4px 6px;
+  }
+  
+  #console-footer {
+    font-size: 10px;
+    gap: 4px;
+  }
+}

@@ -1,4 +1,4 @@
-// Pi Runner — 1-Bit Infinite Runner
+// Chicken Runner — 1-Bit Infinite Runner
 // Pure 2-tone pixel art: every sprite, effect, UI element, and hat is drawn
 // with integer-aligned fillRects (dithering instead of alpha — zero gray).
 // Audio is WebAudio-synthesized with dynamic tempo and retro SFX.
@@ -306,6 +306,7 @@ const audio = {
 
   jump()     { this.tone(300, 750, 0.13, 'square', 0.09); },
   land()     { this.tone(140, 90, 0.07, 'square', 0.05); },
+  thud()     { this.tone(160, 55, 0.22, 'triangle', 0.16); this.noise(0.16, 0.08, 300); },
   slide()    { this.noise(0.18, 0.05, 1400); },
   ding()     { this.tone(988, 988, 0.06, 'square', 0.05); this.tone(1319, 1319, 0.09, 'square', 0.05, 0.07); },
   pickup()   { this.tone(1100, 1100, 0.05, 'square', 0.06); this.tone(1650, 1650, 0.09, 'square', 0.05, 0.05); },
@@ -364,7 +365,6 @@ try {
 const HATS = [
   { id: 'none',   name: 'NONE',         cost: 0,   desc: 'CLASSIC BAREHEAD' },
   { id: 'grad',   name: 'GRAD CAP',     cost: 20,  desc: 'ACADEMIC EXCELLENCE' },
-  { id: 'shades', name: 'PIXEL SHADES', cost: 40,  desc: 'COOL 1-BIT SUNGLASSES' },
   { id: 'crown',  name: 'EGG CROWN',    cost: 80,  desc: 'ROYAL HEIR TO THE NEST' },
   { id: 'ribbon', name: 'RIBBON COMB',  cost: 15,  desc: 'CUTE POP OF POLKA' },
   { id: 'viking', name: 'VIKING HELM',  cost: 60,  desc: 'FEATHERED CONQUEROR' },
@@ -373,17 +373,29 @@ const HATS = [
 ];
 
 let bankEggs = 0;
-let unlockedHats = [true, false, false, false, false, false, false, false];
+let unlockedHats = [true, false, false, false, false, false, false];
 let activeHat = 0;
 let shopSelect = 0;
 
 try {
   bankEggs = parseInt(localStorage.getItem(BANK_KEY) || '0', 10) || 0;
   activeHat = parseInt(localStorage.getItem(ACTIVE_HAT_KEY) || '0', 10) || 0;
-  const uh = JSON.parse(localStorage.getItem(HATS_KEY) || '[true]');
+  let uh = JSON.parse(localStorage.getItem(HATS_KEY) || '[true]');
   if (Array.isArray(uh)) {
+    // Migration: old saves had 8 slots (PIXEL SHADES was index 2) —
+    // drop that slot and shift every hat after it one position down.
+    if (uh.length > HATS.length) {
+      uh = uh.slice(0, 2).concat(uh.slice(3));
+      if (activeHat === 2) activeHat = 0;
+      else if (activeHat > 2) activeHat--;
+      try {
+        localStorage.setItem(HATS_KEY, JSON.stringify(uh));
+        localStorage.setItem(ACTIVE_HAT_KEY, String(activeHat));
+      } catch (e2) {}
+    }
     for (let i = 0; i < HATS.length; i++) unlockedHats[i] = !!uh[i];
   }
+  if (activeHat < 0 || activeHat >= HATS.length) activeHat = 0;
 } catch (e) {}
 function saveShopData() {
   try {
@@ -440,6 +452,9 @@ let groundOff = 0, hillOff = 0;
 let clouds = [], skyStars = [], hills = [], picks = [], obstacles = [], parts = [], deathStars = [];
 let nextGap = 550, milestone = 0, hiNew = false;
 let deathT = 0, shake = 0, flash = 0, time = 0;
+let hitstop = 0;                // freeze frames for impact (death / near-miss)
+let deathFalling = false;       // death sequence: chicken still dropping to the ground
+let deathLanded = false;        // death sequence: butt hit the ground, stars out
 let blinkT = 0, nextBlink = 2.5, idleT = 0, duckT = 0;
 let stats = { cleared: 0, eggs: 0, top: 0, nearMisses: 0 };
 let totals = { runs: 0, eggs: 0 };
@@ -557,29 +572,28 @@ function ditherRect(pal, x, y, w, h, dense) {
 
 // ---------- hat anchor points (per chicken & pose, in sprite units) ----------
 // cx/top = centre & top of the head crest (regular hats rest on it),
-// ex/ey  = centre of the eye (the shades snap onto it).
 // bob = head shifts +1 unit forward on run stride 0 (ChubbyChick is a ball: no bob).
 const HAT_ANCHORS = [
   // 0: PI-CLUCK
   { bob: true,  run:  { cx: 10, top: 2,  ex: 11, ey: 4 }, jump: { cx: 10, top: 2,  ex: 11, ey: 4 },
                    duck:  { cx: 17, top: 0,  ex: 17, ey: 4 }, peck: { cx: 14, top: 3,  ex: 14, ey: 7 },
-                   dead:  { cx: 17, top: 2,  ex: 17, ey: 5 } },
+                   dead:  { cx: 10, top: 2,  ex: 11, ey: 4 } },
   // 1: ROOSTER REX
   { bob: true,  run:  { cx: 10, top: 2,  ex: 11, ey: 4 }, jump: { cx: 10, top: 2,  ex: 11, ey: 4 },
                    duck:  { cx: 17, top: -1, ex: 17, ey: 4 }, peck: { cx: 15, top: 2,  ex: 15, ey: 8 },
-                   dead:  { cx: 17, top: 2,  ex: 17, ey: 5 } },
+                   dead:  { cx: 9,  top: 2,  ex: 11, ey: 4 } },
   // 2: CHUBBY CHICK (round fluffball)
   { bob: false, run:  { cx: 9,  top: 2,  ex: 12, ey: 7 }, jump: { cx: 9,  top: 2,  ex: 12, ey: 7 },
                    duck:  { cx: 10, top: 7,  ex: 14, ey: 9 }, peck: { cx: 9,  top: 6,  ex: 13, ey: 11 },
-                   dead:  { cx: 10, top: 7,  ex: 15, ey: 10 } },
+                   dead:  { cx: 8,  top: 2,  ex: 12, ey: 6 } },
   // 3: MECHA-PI
   { bob: true,  run:  { cx: 10, top: 2,  ex: 12, ey: 5 }, jump: { cx: 10, top: 2,  ex: 12, ey: 5 },
                    duck:  { cx: 17, top: 2,  ex: 17, ey: 4 }, peck: { cx: 14, top: 5,  ex: 14, ey: 7 },
-                   dead:  { cx: 17, top: 2,  ex: 17, ey: 5 } },
+                   dead:  { cx: 10, top: 2,  ex: 12, ey: 5 } },
   // 4: SHINOBI HEN
   { bob: true,  run:  { cx: 10, top: 2,  ex: 12, ey: 5 }, jump: { cx: 10, top: 2,  ex: 12, ey: 5 },
                    duck:  { cx: 17, top: 2,  ex: 16, ey: 4 }, peck: { cx: 14, top: 5,  ex: 14, ey: 7 },
-                   dead:  { cx: 17, top: 2,  ex: 17, ey: 5 } }
+                   dead:  { cx: 10, top: 2,  ex: 12, ey: 5 } }
 ];
 
 // ---------- hats renderer (pure 1-bit whole-pixel) ----------
@@ -596,7 +610,6 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
   const bob = (mode === 'run' && frame === 0 && ch.bob) ? 1 : 0;
   const hx = a.cx - 10 + bob;      // hat art was drawn around (0, 0) = PiCluck's head
   const hy = a.top - 2;
-  const ex = a.ex + bob, ey = a.ey;
 
   ctx.fillStyle = pal.fg;
   switch (hatIdx) {
@@ -610,15 +623,7 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
       R(hx + 3, hy + 3, 2, 2);       // tassel fringe
       break;
 
-    case 2: // Pixel Shades (side view, lens snapped onto the eye)
-      R(ex - 1, ey - 1, 4, 3);       // lens block over the eye
-      R(ex - 4, ey - 1, 3, 1);       // temple arm back along the head
-      ctx.fillStyle = pal.bg;
-      R(ex + 1, ey, 1, 1);           // lens glint
-      ctx.fillStyle = pal.fg;
-      break;
-
-    case 3: // Egg Crown
+    case 2: // Egg Crown
       R(hx + 6, hy - 1, 9, 3);       // base
       R(hx + 6, hy - 3, 2, 2);       // left spike
       R(hx + 9, hy - 4, 3, 3);       // middle spike
@@ -630,7 +635,7 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
       ctx.fillStyle = pal.fg;
       break;
 
-    case 4: // Ribbon Comb
+    case 3: // Ribbon Comb
       R(hx + 6, hy - 1, 3, 3);       // left bow
       R(hx + 11, hy - 1, 3, 3);      // right bow
       R(hx + 9, hy, 2, 2);           // center knot
@@ -640,7 +645,7 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
       ctx.fillStyle = pal.fg;
       break;
 
-    case 5: // Viking Helm
+    case 4: // Viking Helm
       R(hx + 6, hy - 1, 9, 3);       // iron dome
       R(hx + 4, hy - 3, 2, 3);       // left horn base
       R(hx + 3, hy - 5, 2, 3);       // left horn tip
@@ -652,7 +657,7 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
       ctx.fillStyle = pal.fg;
       break;
 
-    case 6: // Top Hat
+    case 5: // Top Hat
       R(hx + 4, hy, 13, 2);          // wide brim
       R(hx + 7, hy - 6, 7, 6);       // cylinder crown
       ctx.fillStyle = pal.bg;
@@ -660,7 +665,7 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
       ctx.fillStyle = pal.fg;
       break;
 
-    case 7: // Chef Toque
+    case 6: // Chef Toque
       R(hx + 7, hy, 7, 2);           // brim band
       R(hx + 5, hy - 6, 11, 6);      // puffy dome
       ctx.fillStyle = pal.bg;
@@ -688,23 +693,34 @@ function drawPiCluck(pal, x, yTop, mode, frame, blinkOn) {
     ctx.fillStyle = pal.fg; r(5, 9, 3, 3); r(9, 9, 3, 3); // legs
     return;
   }
-  if (mode === 'duck' || mode === 'dead') {
+  if (mode === 'dead') {
+    // SITTING: butt on the ground (y=11 = ground line), legs stretched forward, dizzy X eye
+    r(8, 0, 2, 2); r(10, -1, 3, 2); r(13, 0, 2, 2);    // comb peaks
+    r(8, 1, 7, 2);                                      // comb base
+    r(7, 2, 8, 5);                                      // head y2..6
+    r(15, 4, 4, 2); r(18, 5, 2, 1);                     // beak
+    r(14, 7, 3, 2);                                     // wattle (chin hangs onto body)
+    ctx.fillStyle = pal.bg; r(9, 3, 4, 4);              // eye socket
+    ctx.fillStyle = pal.fg;
+    r(9, 3, 1, 1); r(12, 3, 1, 1);                      // X eye
+    r(10, 4, 2, 2);
+    r(9, 6, 1, 1); r(12, 6, 1, 1);
+    r(3, 6, 11, 6);                                     // slumped body y6..11, butt on ground
+    r(0, 7, 4, 5);                                      // tail propped behind
+    ctx.fillStyle = pal.bg; r(6, 8, 5, 3);              // wing draped
+    ctx.fillStyle = pal.fg;
+    r(13, 9, 7, 1);                                     // far leg
+    r(13, 10, 8, 2);                                    // near leg y10..11
+    r(21, 9, 2, 3);                                     // foot, toes up
+    return;
+  }
+  if (mode === 'duck') {
     r(3, 4, 14, 7);                                    // low streamlined body
     r(14, 2, 6, 5);                                    // stretched head
     r(19, 4, 4, 2);                                    // sharp beak
     r(14, 0, 4, 2);                                    // flattened comb
     r(16, 7, 2, 2);                                    // wattle
     r(1, 3, 4, 4);                                     // tail
-    if (mode === 'dead') {
-      ctx.fillStyle = pal.bg; r(15, 3, 4, 4);          // eye socket
-      ctx.fillStyle = pal.fg;
-      r(15, 3, 1, 1); r(18, 3, 1, 1);                  // X eye
-      r(16, 4, 2, 2);
-      r(15, 6, 1, 1); r(18, 6, 1, 1);
-      r(5, 5, 2, 5); r(9, 5, 2, 5);                    // comical drumsticks in the air
-      r(4, 4, 4, 1); r(8, 4, 4, 1);                    // splayed claws
-      return;
-    }
     ctx.fillStyle = pal.bg; r(16, 3, 2, 2);            // eye
     r(7, 6, 6, 2);                                     // wing
     ctx.fillStyle = pal.fg; r(5, 11, 3, 1); r(10, 11, 3, 1); // tucked feet
@@ -741,8 +757,13 @@ function drawPiCluck(pal, x, yTop, mode, frame, blinkOn) {
 
   // Animated Flapping Wing
   if (mode === 'jump') {
-    ctx.fillStyle = pal.bg; r(4, 8, 8, 5);                       // frantic jump flapping
-    ctx.fillStyle = pal.fg; r(5, 9, 6, 3);
+    if (frame === 0) {
+      ctx.fillStyle = pal.bg; r(4, 7, 8, 5);           // wings beat up
+      ctx.fillStyle = pal.fg; r(5, 8, 6, 3);
+    } else {
+      ctx.fillStyle = pal.bg; r(4, 10, 8, 5);          // wings beat down
+      ctx.fillStyle = pal.fg; r(5, 11, 6, 3);
+    }
   } else if (frame === 0) {
     ctx.fillStyle = pal.bg; r(5, 11, 7, 4);                      // stride 0: tucked wing
     ctx.fillStyle = pal.fg; r(6, 12, 5, 2);
@@ -777,18 +798,32 @@ function drawRoosterRex(pal, x, yTop, mode, frame, blinkOn) {
     ctx.fillStyle = pal.fg; r(6, 10, 3, 2); r(10, 10, 3, 2);
     return;
   }
-  if (mode === 'duck' || mode === 'dead') {
+  if (mode === 'dead') {
+    // SITTING ROYALTY: butt down, giant comb, long wattle, X eye
+    r(5, -2, 2, 4); r(8, -4, 3, 6); r(12, -3, 3, 5); r(15, -1, 2, 3);
+    r(5, 1, 12, 2);                                     // crown comb base
+    r(6, 2, 8, 5);                                      // head y2..6
+    r(14, 4, 4, 3); r(17, 6, 3, 2);                     // hooked beak
+    r(13, 7, 3, 4); r(14, 10, 2, 1);                    // long double wattle
+    ctx.fillStyle = pal.bg; r(8, 3, 4, 4);              // eye socket
+    ctx.fillStyle = pal.fg;
+    r(8, 3, 1, 1); r(11, 3, 1, 1);                      // X eye
+    r(9, 4, 2, 2);
+    r(8, 6, 1, 1); r(11, 6, 1, 1);
+    r(3, 6, 11, 6);                                     // slumped body, butt on ground
+    r(0, 5, 4, 6); r(1, 9, 3, 3);                       // sickle tail propped behind
+    ctx.fillStyle = pal.bg; r(5, 8, 5, 3);              // wing
+    ctx.fillStyle = pal.fg;
+    r(13, 9, 7, 1);                                     // far drumstick
+    r(13, 10, 8, 2);                                    // near drumstick y10..11
+    r(21, 9, 2, 3);                                     // heel spur claw
+    return;
+  }
+  if (mode === 'duck') {
     r(3, 4, 14, 7); r(14, 2, 6, 5); r(20, 4, 4, 2);
     r(13, -1, 5, 3);                                   // swept comb
     r(16, 7, 3, 3);                                    // long wattle
     r(0, 2, 4, 6);                                     // arched tail
-    if (mode === 'dead') {
-      ctx.fillStyle = pal.bg; r(15, 3, 4, 4);
-      ctx.fillStyle = pal.fg;
-      r(15, 3, 1, 1); r(18, 3, 1, 1); r(16, 4, 2, 2); r(15, 6, 1, 1); r(18, 6, 1, 1);
-      r(5, 5, 2, 6); r(10, 5, 2, 6); r(4, 4, 5, 1); r(9, 4, 5, 1);
-      return;
-    }
     ctx.fillStyle = pal.bg; r(16, 3, 2, 2); r(7, 6, 6, 2);
     ctx.fillStyle = pal.fg; r(5, 11, 3, 1); r(10, 11, 3, 1);
     return;
@@ -847,15 +882,29 @@ function drawChubbyChick(pal, x, yTop, mode, frame, blinkOn) {
     ctx.fillStyle = pal.fg; r(6, 16, 2, 2); r(10, 16, 2, 2);
     return;
   }
-  if (mode === 'duck' || mode === 'dead') {
+  if (mode === 'dead') {
+    // SITTING FLUFFBALL: round body puddled on the ground, legs out, X eye
+    r(5, 1, 6, 2); r(3, 3, 10, 2);                      // ball top (head merged)
+    r(8, 0, 2, 2); r(10, 1, 2, 1);                      // sprout comb bud
+    r(1, 5, 14, 6);                                     // wide body y5..10
+    r(3, 11, 11, 1);                                    // bottom row flat on ground
+    r(0, 6, 2, 3);                                      // tail puff behind
+    ctx.fillStyle = pal.bg; r(9, 4, 5, 4);              // big eye socket
+    ctx.fillStyle = pal.fg;
+    r(9, 4, 1, 1); r(13, 4, 1, 1);                      // X eye
+    r(10, 5, 3, 2);
+    r(9, 7, 1, 1); r(13, 7, 1, 1);
+    r(14, 7, 3, 2); r(16, 8, 1, 1);                     // tiny beak
+    ditherRect(pal, Math.round(x) + 4 * S, Math.round(yTop) + 7 * S, 2 * S, 2 * S, true); // rosy cheek
+    ctx.fillStyle = pal.fg;
+    r(14, 9, 6, 1);                                     // far leg
+    r(13, 10, 8, 1);                                    // near leg
+    r(13, 11, 8, 1);                                    // on-ground row
+    r(21, 9, 2, 2);                                     // webbed foot, toes up
+    return;
+  }
+  if (mode === 'duck') {
     r(2, 7, 16, 8); r(17, 10, 3, 2);                   // flattened pancake chick
-    if (mode === 'dead') {
-      ctx.fillStyle = pal.bg; r(13, 8, 4, 4);
-      ctx.fillStyle = pal.fg;
-      r(13, 8, 1, 1); r(16, 8, 1, 1); r(14, 9, 2, 2); r(13, 11, 1, 1); r(16, 11, 1, 1);
-      r(6, 6, 2, 3); r(10, 6, 2, 3);
-      return;
-    }
     ctx.fillStyle = pal.bg; r(13, 8, 3, 3);
     ctx.fillStyle = pal.fg; r(6, 15, 2, 1); r(10, 15, 2, 1);
     return;
@@ -889,7 +938,10 @@ function drawChubbyChick(pal, x, yTop, mode, frame, blinkOn) {
 
   // Tiny Stubby Wings (Heated Fast Flutter!)
   ctx.fillStyle = pal.fg;
-  if (mode === 'jump' || frame === 1) {
+  if (mode === 'jump') {
+    if (frame === 0) r(3, 5, 4, 4), r(2, 6, 2, 3);    // wings beat high
+    else             r(3, 8, 4, 4), r(2, 9, 2, 3);    // wings beat low
+  } else if (frame === 1) {
     r(3, 6, 4, 4); r(2, 7, 2, 2);                      // wings lifted high in adorable flutter!
   } else {
     r(4, 9, 4, 3);
@@ -916,16 +968,28 @@ function drawMechaPi(pal, x, yTop, mode, frame, blinkOn) {
     ctx.fillStyle = pal.fg; r(6, 9, 2, 3); r(10, 9, 2, 3);
     return;
   }
-  if (mode === 'duck' || mode === 'dead') {
+  if (mode === 'dead') {
+    // SITTING POWER-DOWN: butt on ground, visor showing an X error, legs out
+    r(9, -2, 2, 3); r(8, -3, 4, 1);                    // limp antenna
+    r(5, 2, 10, 5);                                    // helmet y2..6
+    ctx.fillStyle = pal.bg; r(9, 3, 6, 3);             // dead visor
+    ctx.fillStyle = pal.fg;
+    r(9, 3, 1, 1); r(14, 3, 1, 1);                     // X error code
+    r(10, 4, 1, 1); r(13, 4, 1, 1);
+    r(9, 5, 1, 1); r(14, 5, 1, 1);
+    r(15, 4, 4, 2); r(18, 5, 2, 1);                    // beak
+    r(3, 6, 12, 6);                                    // armored torso y6..11
+    r(0, 7, 4, 5);                                     // rocket nozzle behind
+    ctx.fillStyle = pal.bg; r(7, 8, 1, 3); r(5, 9, 6, 1); // panel seams
+    ctx.fillStyle = pal.fg;
+    r(13, 9, 7, 1);                                    // hydraulic leg out
+    r(13, 10, 8, 2);                                   // shock pad y10..11
+    r(21, 9, 2, 3);                                    // toe plate up
+    return;
+  }
+  if (mode === 'duck') {
     r(3, 4, 14, 7); r(14, 2, 6, 5); r(19, 4, 4, 2);
     r(0, 5, 4, 5);                                     // rocket nozzle
-    if (mode === 'dead') {
-      ctx.fillStyle = pal.bg; r(15, 3, 4, 4);
-      ctx.fillStyle = pal.fg;
-      r(15, 3, 1, 1); r(18, 3, 1, 1); r(16, 4, 2, 2); r(15, 6, 1, 1); r(18, 6, 1, 1);
-      r(5, 5, 2, 5); r(9, 5, 2, 5);                    // sparks from joints
-      return;
-    }
     ctx.fillStyle = pal.bg; r(15, 3, 4, 2);
     ctx.fillStyle = pal.fg; r(5, 11, 3, 1); r(10, 11, 3, 1);
     return;
@@ -988,16 +1052,29 @@ function drawShinobiHen(pal, x, yTop, mode, frame, blinkOn) {
     ctx.fillStyle = pal.fg; r(5, 9, 3, 3); r(9, 9, 3, 3);
     return;
   }
-  if (mode === 'duck' || mode === 'dead') {
+  if (mode === 'dead') {
+    // SITTING STEALTH FAIL: butt down, ribbons draped behind, mask on, X eye
+    r(6, 2, 8, 5);                                     // cowl head y2..6
+    r(5, 2, 1, 2);                                     // headband knot
+    r(6, 2, 8, 1);                                     // headband strip
+    ctx.fillStyle = pal.bg; r(9, 3, 4, 4);             // eye socket
+    ctx.fillStyle = pal.fg;
+    r(9, 3, 1, 1); r(12, 3, 1, 1);                     // X eye
+    r(10, 4, 2, 2);
+    r(9, 6, 1, 1); r(12, 6, 1, 1);
+    r(15, 4, 4, 2); r(18, 5, 2, 1);                    // beak poking out the mask
+    r(3, 6, 11, 6);                                    // slim body y6..11
+    r(0, 8, 4, 1); r(-1, 9, 4, 1);                     // ribbons pooled on ground
+    ctx.fillStyle = pal.bg; r(5, 8, 5, 3);             // blade wing resting
+    ctx.fillStyle = pal.fg;
+    r(13, 9, 7, 1);                                    // far leg
+    r(13, 10, 8, 2);                                   // near leg y10..11
+    r(21, 9, 2, 3);                                    // tabi foot up
+    return;
+  }
+  if (mode === 'duck') {
     r(3, 4, 14, 7); r(14, 2, 6, 5); r(19, 4, 4, 2);
     r(1, 3, 4, 4);
-    if (mode === 'dead') {
-      ctx.fillStyle = pal.bg; r(15, 3, 4, 4);
-      ctx.fillStyle = pal.fg;
-      r(15, 3, 1, 1); r(18, 3, 1, 1); r(16, 4, 2, 2); r(15, 6, 1, 1); r(18, 6, 1, 1);
-      r(5, 5, 2, 5); r(9, 5, 2, 5);
-      return;
-    }
     ctx.fillStyle = pal.bg; r(15, 3, 3, 2);
     ctx.fillStyle = pal.fg; r(5, 11, 3, 1); r(10, 11, 3, 1);
     return;
@@ -1092,10 +1169,13 @@ function drawFeather(pal, x, y, ph) {
 function makeObstacle(type, x) {
   const o = { type, x, w: 0, h: 0, y: 0, passed: false, nearMissed: false };
   if (type === 'spike')   { o.w = 54; o.h = 21; o.y = GROUND - o.h; }
-  if (type === 'crate')   { o.w = 30; o.h = 30; o.y = GROUND - o.h; }
   if (type === 'barrier') { o.w = 48; o.h = 42; o.y = GROUND - o.h; }
   if (type === 'stack')   { o.w = 36; o.h = 51; o.y = GROUND - o.h; }
-  if (type === 'drone')   { o.w = 60; o.h = 18; o.y = GROUND - 61; }
+  if (type === 'fence')   { o.w = 54; o.h = 36; o.y = GROUND - o.h; }
+  if (type === 'fox')     { o.w = 58; o.h = 32; o.y = GROUND - o.h; }
+  if (type === 'hay')     { o.w = 46; o.h = 46; o.y = GROUND - o.h; }
+  if (type === 'falcon')  { o.w = 56; o.h = 20; o.y = GROUND - 61; o.fly = true; }
+  if (type === 'owl')     { o.w = 48; o.h = 20; o.y = GROUND - 61; o.fly = true; }
   o.x = x;
   return o;
 }
@@ -1103,12 +1183,9 @@ function makeObstacle(type, x) {
 function drawObstacle(pal, t, o) {
   const x = Math.round(o.x), y = Math.round(o.y);
   ctx.fillStyle = pal.fg;
-  if (o.type === 'crate' || o.type === 'stack') {
-    if (o.type === 'crate') { box(x, y, 30, 30); crateDetail(pal, x, y, 30, 30); }
-    else {
-      box(x, y + 21, 36, 30); crateDetail(pal, x, y + 21, 36, 30);
-      box(x + 6, y, 24, 21);  crateDetail(pal, x + 6, y, 24, 21);
-    }
+  if (o.type === 'stack') {
+    box(x, y + 21, 36, 30); crateDetail(pal, x, y + 21, 36, 30);
+    box(x + 6, y, 24, 21);  crateDetail(pal, x + 6, y, 24, 21);
   } else if (o.type === 'spike') {
     for (let i = 0; i < 3; i++) {
       const sx = x + i * 18;
@@ -1121,15 +1198,81 @@ function drawObstacle(pal, t, o) {
     ctx.fillStyle = pal.fg;
     box(x + 6, y + 16, 5, 22); box(x + 37, y + 16, 5, 22);
     box(x + 2, y + 38, 13, 4); box(x + 33, y + 38, 13, 4);
-  } else if (o.type === 'drone') {
-    const spin = (Math.floor(t * 14) % 2) === 0;
-    box(x + (spin ? 2 : 8), y, spin ? 56 : 44, 3);
-    box(x + 14, y + 3, 4, 3); box(x + 42, y + 3, 4, 3);
-    box(x + 6, y + 6, 48, 10);
+  } else if (o.type === 'fence') {
+    // Farm fence: two posts + two rails
+    box(x, y + 6, 6, 30); box(x + 48, y + 6, 6, 30);
+    box(x, y + 10, 54, 6); box(x, y + 24, 54, 6);
     ctx.fillStyle = pal.bg;
-    box(x + 16, y + 9, 8, 4); box(x + 36, y + 9, 8, 4);
+    box(x + 4, y + 11, 46, 2); box(x + 4, y + 25, 46, 2);
+    box(x + 2, y + 6, 2, 3); box(x + 50, y + 6, 2, 3);
     ctx.fillStyle = pal.fg;
-    box(x + 12, y + 16, 4, 2); box(x + 44, y + 16, 4, 2);
+  } else if (o.type === 'fox') {
+    // Crouched fox facing left — breathing/tensing bob (legs stay planted)
+    const bob = (Math.floor(t * 6) % 2) === 0 ? 0 : 2;
+    box(x + 18, y + 8 + bob, 34, 16 - bob);        // body
+    box(x + 40, y + 4 + bob, 14, 10);              // haunch
+    box(x, y + 10 + bob, 22, 12 - bob);            // tail (big brush)
+    ctx.fillStyle = pal.bg;
+    box(x + 3, y + 13 + bob, 8, 6);                // white tail tip
+    box(x + 24, y + 12 + bob, 16, 6);              // body shading
+    ctx.fillStyle = pal.fg;
+    box(x + 44, y + 0 + bob, 6, 6);                // ear
+    box(x + 48, y + 6 + bob, 6, 8);                // cheek
+    box(x + 44, y + 12 + bob, 8, 6);               // snout
+    ctx.fillStyle = pal.bg;
+    box(x + 46, y + 8 + bob, 3, 3);                // eye
+    box(x + 44, y + 15 + bob, 3, 3);               // nose
+    ctx.fillStyle = pal.fg;
+    box(x + 20, y + 24, 6, 8);                     // front leg
+    box(x + 42, y + 24, 6, 8);                     // back leg
+    box(x + 16, y + 30, 12, 2); box(x + 38, y + 30, 12, 2); // paws
+  } else if (o.type === 'hay') {
+    // Round hay bale with spiral straw lines
+    box(x + 6, y, 34, 6); box(x + 2, y + 6, 42, 34);
+    box(x + 6, y + 40, 34, 6);
+    ctx.fillStyle = pal.bg;
+    box(x + 8, y + 4, 30, 2); box(x + 4, y + 12, 38, 2);
+    box(x + 4, y + 22, 38, 2); box(x + 4, y + 32, 38, 2);
+    box(x + 8, y + 40, 30, 2);
+    box(x + 20, y + 8, 2, 30);                   // spiral core
+    box(x + 14, y + 16, 14, 2); box(x + 14, y + 28, 14, 2);
+    ctx.fillStyle = pal.fg;
+    box(x + 40, y + 16, 4, 14);                  // bale twine band
+    ctx.fillStyle = pal.bg;
+    box(x + 40, y + 20, 4, 2);
+    ctx.fillStyle = pal.fg;
+  } else if (o.type === 'falcon') {
+    // Falcon skimming low — 2-frame beating wings (duck to survive)
+    const beat = (Math.floor(t * 12) % 2) === 0;
+    box(x + 14, y + 8, 30, 10);                  // sleek body
+    box(x + 40, y + 6, 10, 8);                   // head
+    box(x + 50, y + 8, 6, 3);                    // hooked beak
+    ctx.fillStyle = pal.bg;
+    box(x + 43, y + 8, 3, 3);                    // eye
+    box(x + 18, y + 11, 18, 4);                  // wing shadow
+    ctx.fillStyle = pal.fg;
+    if (beat) { box(x + 16, y, 26, 6); box(x + 20, y - 4, 16, 4); }   // wings up
+    else      { box(x + 16, y + 16, 26, 4); box(x + 22, y + 20, 16, 2); } // wings down
+    box(x + 8, y + 10, 8, 6);                    // tail feathers
+    ctx.fillStyle = pal.bg;
+    box(x + 10, y + 12, 4, 2);
+    ctx.fillStyle = pal.fg;
+  } else if (o.type === 'owl') {
+    // Night owl, wings spread wide (duck to survive)
+    const beat = (Math.floor(t * 8) % 2) === 0;
+    box(x + 16, y + 4, 20, 16);                  // round body
+    box(x + 14, y, 8, 6); box(x + 30, y, 8, 6);  // ear tufts
+    ctx.fillStyle = pal.bg;
+    box(x + 20, y + 6, 5, 5); box(x + 28, y + 6, 5, 5);  // huge eyes
+    ctx.fillStyle = pal.fg;
+    box(x + 22, y + 8, 2, 2); box(x + 30, y + 8, 2, 2);  // pupils
+    box(x + 25, y + 12, 4, 3);                   // beak
+    ctx.fillStyle = pal.bg;
+    box(x + 19, y + 13, 12, 5);                  // pale chest
+    ctx.fillStyle = pal.fg;
+    if (beat) { box(x + 0, y + 2, 16, 6); box(x + 36, y + 2, 12, 6); }    // wings raised
+    else      { box(x + 0, y + 14, 16, 5); box(x + 36, y + 14, 12, 5); }  // wings swept
+    box(x + 20, y + 18, 4, 2); box(x + 28, y + 18, 4, 2); // talons
   }
 }
 
@@ -1152,11 +1295,13 @@ function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y 
 function spawnObstacle() {
   const pool = [];
   const add = (t, w) => { for (let i = 0; i < w; i++) pool.push(t); };
-  if (score < 260) { add('spike', 3); add('crate', 3); }
+  if (score < 260) { add('spike', 3); add('fence', 2); }
   else {
-    add('spike', 3); add('crate', 3); add('barrier', 2);
-    if (score > 320) add('drone', 3);
-    if (score > 600) add('stack', 2);
+    add('spike', 3); add('barrier', 2); add('fence', 2);
+    if (score > 320) add('fox', 2);
+    if (score > 350) add('falcon', 3);
+    if (score > 400 && nightTarget) add('owl', 2);
+    if (score > 600) { add('stack', 2); add('hay', 2); }
   }
   const type = pool[(Math.random() * pool.length) | 0];
   const o = makeObstacle(type, W + 40);
@@ -1182,6 +1327,7 @@ function resetRun() {
   obstacles = []; parts = []; picks = []; deathStars = []; floatingTexts = [];
   nextGap = 550; milestone = 0; hiNew = false;
   deathT = 0; shake = 0; flash = 0; duckT = 0;
+  hitstop = 0; deathFalling = false; deathLanded = false;
   stats = { cleared: 0, eggs: 0, top: 0, nearMisses: 0 };
   eggStreak = 0; eggStreakTimer = 0; milestoneBanner = null;
   nightTarget = false;
@@ -1197,16 +1343,14 @@ function resetRun() {
 }
 
 function die() {
-  state = 'dead'; deathT = 0; shake = 0.3; flash = 0.18;
+  state = 'dead'; deathT = 0; shake = 0; flash = 0.18;
+  hitstop = 0.09;               // arcade freeze on the collision frame
+  deathFalling = true; deathLanded = false;
   audio.die();
   vibrate([40, 40, 80]);
-  const pb = playerBox();
-  for (let i = 0; i < 16; i++) parts.push({
-    x: pb.x + pb.w / 2, y: pb.y + pb.h / 2,
-    vx: rand(-260, 260), vy: rand(-380, -60),
-    life: rand(0.5, 1.1), s: rand(3, 6)
-  });
-  for (let i = 0; i < 3; i++) deathStars.push({ a: i * 2.09, r: 30 + i * 4 });
+  // The chicken keeps falling from where it was — gravity does the rest in update().
+  player.vy = Math.min(player.vy, -140);   // small pop upward before the drop
+  player.onGround = false;
   totals.eggs += stats.eggs;
   bankEggs += stats.eggs;
   saveTotals();
@@ -1257,7 +1401,7 @@ function handlePointerDownButtons(pos) {
 
 // Copy scorecard text to clipboard
 function copyScoreToClipboard() {
-  const text = `Pi Runner — 1-Bit Infinite Run!\nDistance: ${pad5(Math.floor(score))}m | Cleared: ${stats.cleared} | Eggs: ${stats.eggs} | Top Speed: ${stats.top} px/s\nCan you beat my record?`;
+  const text = `Chicken Runner — 1-Bit Infinite Run!\nDistance: ${pad5(Math.floor(score))}m | Cleared: ${stats.cleared} | Eggs: ${stats.eggs} | Top Speed: ${stats.top} px/s\nCan you beat my record?`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       showToast('SCORE COPIED TO CLIPBOARD!');
@@ -1449,6 +1593,9 @@ if (domTouchJump) {
 function update(dt) {
   time += dt;
 
+  // Hitstop: freeze the world for a few frames on big impacts (still renders)
+  if (hitstop > 0) { hitstop = Math.max(0, hitstop - dt); return; }
+
   // Back at the menu (death MENU / pause QUIT): clear leftover run field
   if (state === 'menu' && (obstacles.length || picks.length || parts.length || deathStars.length || floatingTexts.length)) {
     obstacles = []; picks = []; parts = []; deathStars = []; floatingTexts = [];
@@ -1488,7 +1635,9 @@ function update(dt) {
   // Day/Night switch
   if (state === 'playing') {
     elapsed += dt;
-    speed = Math.min(400 + score * 0.14, 940);
+    // Gentle asymptotic ramp: eases toward 940 px/s instead of hitting it ~1 min in.
+    // ~550 at 2000m, ~740 at 6000m, ~840 at 10000m, never quite tops out.
+    speed = 400 + 540 * (1 - Math.exp(-score / 6000));
     score += speed * dt / 10;
     stats.top = Math.max(stats.top, Math.round(speed));
 
@@ -1553,11 +1702,12 @@ function update(dt) {
         const obBox = obsBox(o);
         const vertDist = Math.abs(pb.y + pb.h - obBox.y);
         const horizDist = Math.abs(player.x - (o.x + o.w));
-        if (vertDist < 18 || (o.type === 'drone' && pb.y > obBox.y + obBox.h - 16)) {
+        if (vertDist < 18 || (o.fly && pb.y > obBox.y + obBox.h - 16)) {
           o.nearMissed = true;
           stats.nearMisses++;
           score += 10;
           flash = 0.06;
+          hitstop = 0.05;           // heart-punch freeze on close calls
           audio.nearMiss();
           vibrate(15);
           floatingTexts.push({ text: 'CLOSE! +10', x: player.x + 20, y: player.y - 10, life: 0.8, maxLife: 0.8 });
@@ -1619,13 +1769,19 @@ function update(dt) {
       if (duckHeld) player.vy = Math.max(player.vy, 700);
       player.vy += G * dt;
       player.y += player.vy * dt;
+      // Wings beat while airborne: run the frame counter up here too
+      player.animT += dt;
+      if (player.animT > 0.09) { player.animT = 0; player.frame ^= 1; }
       if (player.y >= GROUND - STAND_H) {
         player.y = GROUND - STAND_H; player.vy = 0;
-        if (!player.onGround) { audio.land(); vibrate(10); }
+        if (!player.onGround) {
+          audio.land(); vibrate(10);
+        }
         player.onGround = true;
-        for (let j = 0; j < 6; j++) parts.push({
-          x: player.x + rand(6, 46), y: GROUND - 2, vx: rand(-140, 140), vy: rand(-90, -20),
-          life: rand(0.2, 0.45), s: rand(2, 5)
+        player.frame = 0;
+        for (let j = 0; j < 12; j++) parts.push({
+          x: player.x + rand(4, 50), y: GROUND - 2, vx: rand(-220, 220), vy: rand(-140, -30),
+          life: rand(0.25, 0.55), s: rand(2, 6)
         });
       }
     } else {
@@ -1655,6 +1811,31 @@ function update(dt) {
     }
   } else if (state === 'dead') {
     deathT += dt;
+
+    // Death fall: chicken drops from where it died, butt-slams the ground once
+    if (deathFalling) {
+      player.vy += G * dt;
+      player.y += player.vy * dt;
+      if (player.y >= GROUND - STAND_H) {
+        player.y = GROUND - STAND_H;
+        player.vy = 0;
+        deathFalling = false;
+        deathLanded = true;
+        shake = 0.45;                       // hard tremor on the slam
+        audio.land();
+        audio.thud();
+        vibrate([30, 25, 60]);
+        // Dust ring bursting out both sides of the impact
+        for (let j = 0; j < 14; j++) parts.push({
+          x: player.x + rand(4, 52), y: GROUND - 4,
+          vx: rand(-280, 280), vy: rand(-200, -40),
+          life: rand(0.3, 0.7), s: rand(3, 6)
+        });
+        // 3 dizzy stars orbiting the head — they stay until replay
+        for (let i = 0; i < 3; i++) deathStars.push({ a: i * 2.09, r: 22 + i * 4 });
+      }
+    }
+
     for (const s of deathStars) s.a += dt * 6;
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i];
@@ -1828,16 +2009,17 @@ function drawHUD(pal, t) {
     drawText(meterStr, W / 2, 14, 2, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
   }
 
-  // Drone Danger Telegraph on Right Edge
+  // Flying Danger Telegraph on Right Edge (falcon / owl)
   if (state === 'playing') {
     for (const o of obstacles) {
-      if (o.type === 'drone' && o.x > W - 150 && o.x < W + 80) {
+      if (o.fly && o.x > W - 150 && o.x < W + 80) {
         if (Math.floor(t * 10) % 2 === 0) {
           ctx.fillStyle = pal.fg;
           box(W - 130, GROUND - 68, 120, 20);
           ctx.fillStyle = pal.bg;
           box(W - 128, GROUND - 66, 116, 16);
-          drawText('▲ DUCK DRONE ▲', W - 70, GROUND - 63, 1, pal.fg, { align: 'center', gap: 2 });
+          const warn = o.type === 'falcon' ? 'FALCON' : 'OWL';
+          drawText('▲ DUCK ' + warn + ' ▲', W - 70, GROUND - 63, 1, pal.fg, { align: 'center', gap: 2 });
         }
       }
     }
@@ -1883,7 +2065,7 @@ function drawScreens(pal, t) {
   clearButtons();
 
   if (state === 'menu') {
-    drawText('PI RUNNER', W / 2, 40, 5, pal.fg, { gap: 8, align: 'center', outline: pal.bg });
+    drawText('CHICKEN RUNNER', W / 2, 40, 5, pal.fg, { gap: 8, align: 'center', outline: pal.bg });
     const seasonsList = ['SPRING 🌸', 'SUMMER ☀️', 'AUTUMN 🍂', 'WINTER ❄️'];
     drawText('WORLD // ' + seasonsList[season], W / 2, 84, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
 
@@ -1973,11 +2155,11 @@ function drawScreens(pal, t) {
 
     // Section 1: Jump
     drawText('▲ JUMP [SPACE / UP / RIGHT TAP]', 90, 80, 2, pal.fg, { outline: pal.bg });
-    drawText('CLEAR SPIKES, CRATES & OBSTACLE STACKS', 90, 102, 1, pal.fg, { outline: pal.bg });
+    drawText('CLEAR SPIKES, FENCES, FOXES & HAY', 90, 102, 1, pal.fg, { outline: pal.bg });
 
     // Section 2: Slide
     drawText('▼ SLIDE [DOWN / S / LEFT TAP]', 90, 134, 2, pal.fg, { outline: pal.bg });
-    drawText('DUCK LOW UNDER FLYING DRONES & FAST-FALL', 90, 156, 1, pal.fg, { outline: pal.bg });
+    drawText('DUCK UNDER FALCONS, OWLS & FAST-FALL', 90, 156, 1, pal.fg, { outline: pal.bg });
 
     // Section 3: Eggs & Near Miss
     drawText('🥚 COLLECT EGGS & NEAR-MISS', 90, 188, 2, pal.fg, { outline: pal.bg });
@@ -2174,19 +2356,25 @@ function drawShadow(pal) {
 function drawPlayer(pal, t) {
   const bx = player.x;
   if (state === 'dead') {
+    if (deathFalling) {
+      // Still dropping: panic pose tumbling down
+      drawChicken(pal, bx, player.y, 'jump', Math.floor(t * 12) % 2, false);
+      return;
+    }
+    // Sitting on its butt, legs out, dizzy stars circling the head
     drawChicken(pal, bx, GROUND - 12 * S, 'dead', 0, false);
     ctx.fillStyle = pal.fg;
+    // Orbit centre = the seated head (sprite y2..6 → screen GROUND-30..-18, x≈bx+30)
+    const hx = bx + 30, hy = GROUND - 30;
     for (const f of deathStars) {
-      if (deathT > 1.0) break;
-      if (deathT > 0.7 && Math.floor(t * 12) % 2 === 1) continue;
-      const sx = bx + 20 + Math.cos(f.a) * f.r, sy = GROUND - 74 + Math.sin(f.a) * f.r * 0.5;
-      drawFeather(pal, sx, sy, (Math.floor(t * 10) + 1) % 2);
+      const sx = hx + Math.cos(f.a) * f.r, sy = hy + Math.sin(f.a) * f.r * 0.55;
+      drawText('★', sx, sy, 1, pal.fg, { align: 'center', outline: pal.bg });
     }
     return;
   }
   const bl = blinkT < 0 && state !== 'paused';
   if (player.ducking && player.onGround) drawChicken(pal, bx, player.y + SLIDE_OFF, 'duck', 0, false);
-  else if (!player.onGround) drawChicken(pal, bx, player.y, 'jump', 0, false);
+  else if (!player.onGround) drawChicken(pal, bx, player.y, 'jump', player.frame, false);
   else if (state === 'menu' && idleT < 0 && idleT > -0.3) drawChicken(pal, bx, GROUND - 12 * S, 'peck', 0, false);
   else drawChicken(pal, bx, player.y, 'run', state === 'menu' ? Math.floor(t * 9) % 2 : player.frame, bl);
 }
@@ -2247,7 +2435,7 @@ function frame(t) {
 }
 
 // ---------- public test seam (preserved & extended) ----------
-window.PiRunner = {
+window.ChickenRunner = {
   frame,
   die,
   setScore: v => { score = v; },
@@ -2287,6 +2475,9 @@ window.PiRunner = {
     return n;
   }
 };
+
+// Legacy alias — keeps old test scripts working
+window.PiRunner = window.ChickenRunner;
 
 requestAnimationFrame(frame);
 })();

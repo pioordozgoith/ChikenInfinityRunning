@@ -146,12 +146,28 @@ body:not(.bezel-on) .console-grille {
   background: var(--led);
   box-shadow: 0 0 8px var(--led);
   border: 1px solid rgba(0, 0, 0, 0.6);
+  animation: led-idle 2.6s ease-in-out infinite;
+}
+
+/* Idle = slow breathe. Running = fast arcade pulse (body.is-playing set by JS) */
+@keyframes led-idle {
+  0%, 100% { opacity: 0.55; box-shadow: 0 0 4px var(--led); }
+  50%      { opacity: 1;    box-shadow: 0 0 10px var(--led); }
+}
+
+body.is-playing .power-led {
+  animation: led-play 0.7s ease-in-out infinite;
+}
+
+@keyframes led-play {
+  0%, 100% { opacity: 1;    box-shadow: 0 0 6px var(--led); }
+  50%      { opacity: 0.65; box-shadow: 0 0 15px var(--led); }
 }
 
 .brand-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   color: var(--fg);
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
@@ -187,9 +203,19 @@ body:not(.bezel-on) .console-grille {
   border-color: var(--fg);
 }
 
+/* Keyboard focus ring — arcade key highlight, WCAG-visible */
+.bezel-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .bezel-btn:active {
   transform: translateY(2px);
   box-shadow: none;
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  transition: none;
 }
 
 /* Screen Enclosure */
@@ -206,10 +232,28 @@ canvas#game {
   width: 100%;
   height: auto;
   display: block;
-  background: #ffffff;
+  background: var(--bg); /* no white flash before the first canvas paint */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   touch-action: none;
+}
+
+/* CRT glare + scanlines (this element existed in HTML but had no style) */
+#screen-glare {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(112deg,
+      rgba(255, 255, 255, 0) 0 38%,
+      rgba(255, 255, 255, 0.07) 42%,
+      rgba(255, 255, 255, 0.13) 46%,
+      rgba(255, 255, 255, 0.05) 50%,
+      rgba(255, 255, 255, 0) 54% 100%),
+    repeating-linear-gradient(0deg,
+      rgba(0, 0, 0, 0.16) 0 1px,
+      rgba(0, 0, 0, 0) 1px 3px);
 }
 
 /* Toast Notification (Achievement & Clipboard Popup) */

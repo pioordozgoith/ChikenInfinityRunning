@@ -146,12 +146,28 @@ body:not(.bezel-on) .console-grille {
   background: var(--led);
   box-shadow: 0 0 8px var(--led);
   border: 1px solid rgba(0, 0, 0, 0.6);
+  animation: led-idle 2.6s ease-in-out infinite;
+}
+
+/* Idle = slow breathe. Running = fast arcade pulse (body.is-playing set by JS) */
+@keyframes led-idle {
+  0%, 100% { opacity: 0.55; box-shadow: 0 0 4px var(--led); }
+  50%      { opacity: 1;    box-shadow: 0 0 10px var(--led); }
+}
+
+body.is-playing .power-led {
+  animation: led-play 0.7s ease-in-out infinite;
+}
+
+@keyframes led-play {
+  0%, 100% { opacity: 1;    box-shadow: 0 0 6px var(--led); }
+  50%      { opacity: 0.65; box-shadow: 0 0 15px var(--led); }
 }
 
 .brand-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   color: var(--fg);
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
@@ -187,9 +203,19 @@ body:not(.bezel-on) .console-grille {
   border-color: var(--fg);
 }
 
+/* Keyboard focus ring — arcade key highlight, WCAG-visible */
+.bezel-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .bezel-btn:active {
   transform: translateY(2px);
   box-shadow: none;
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  transition: none;
 }
 
 /* Screen Enclosure */
@@ -206,10 +232,22 @@ canvas#game {
   width: 100%;
   height: auto;
   display: block;
-  background: #ffffff;
+  background: var(--bg); /* no white flash before the first canvas paint */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   touch-action: none;
+}
+
+/* CRT scanlines only — the diagonal "lens flare" band was removed on request */
+#screen-glare {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg,
+      rgba(0, 0, 0, 0.16) 0 1px,
+      rgba(0, 0, 0, 0) 1px 3px);
 }
 
 /* Toast Notification (Achievement & Clipboard Popup) */
@@ -225,11 +263,35 @@ canvas#game {
   font-size: 13px;
   font-weight: bold;
   letter-spacing: 1.5px;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
   z-index: 100;
   transition: opacity 0.25s ease, transform 0.25s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
+}
+
+/* Arcade pop-in: overshoots and settles, instead of a flat fade */
+#toast:not(.toast-hidden) {
+  animation: toast-pop 0.42s cubic-bezier(0.2, 1.7, 0.4, 1) both;
+}
+
+@keyframes toast-pop {
+  from { transform: translate(-50%, -30px) scale(0.86); }
+  60%  { transform: translate(-50%, 3px) scale(1.04); }
+  to   { transform: translate(-50%, 0) scale(1); }
+}
+
+/* 1-bit dither fringe under the toast (only --fg dashes, no new colors) */
+#toast::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -5px;
+  height: 4px;
+  background: repeating-linear-gradient(90deg,
+    var(--fg) 0 3px, transparent 3px 6px);
 }
 
 .toast-hidden {
@@ -311,6 +373,7 @@ canvas#game {
   margin-top: 14px;
   font-size: 11px;
   letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
   text-align: center;
   color: var(--fg);
   opacity: 0.75;

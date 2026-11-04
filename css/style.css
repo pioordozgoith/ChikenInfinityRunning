@@ -238,19 +238,13 @@ canvas#game {
   touch-action: none;
 }
 
-/* CRT glare + scanlines (this element existed in HTML but had no style) */
+/* CRT scanlines only — the diagonal "lens flare" band was removed on request */
 #screen-glare {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(112deg,
-      rgba(255, 255, 255, 0) 0 38%,
-      rgba(255, 255, 255, 0.07) 42%,
-      rgba(255, 255, 255, 0.13) 46%,
-      rgba(255, 255, 255, 0.05) 50%,
-      rgba(255, 255, 255, 0) 54% 100%),
     repeating-linear-gradient(0deg,
       rgba(0, 0, 0, 0.16) 0 1px,
       rgba(0, 0, 0, 0) 1px 3px);
@@ -269,11 +263,35 @@ canvas#game {
   font-size: 13px;
   font-weight: bold;
   letter-spacing: 1.5px;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
   z-index: 100;
   transition: opacity 0.25s ease, transform 0.25s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
+}
+
+/* Arcade pop-in: overshoots and settles, instead of a flat fade */
+#toast:not(.toast-hidden) {
+  animation: toast-pop 0.42s cubic-bezier(0.2, 1.7, 0.4, 1) both;
+}
+
+@keyframes toast-pop {
+  from { transform: translate(-50%, -30px) scale(0.86); }
+  60%  { transform: translate(-50%, 3px) scale(1.04); }
+  to   { transform: translate(-50%, 0) scale(1); }
+}
+
+/* 1-bit dither fringe under the toast (only --fg dashes, no new colors) */
+#toast::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -5px;
+  height: 4px;
+  background: repeating-linear-gradient(90deg,
+    var(--fg) 0 3px, transparent 3px 6px);
 }
 
 .toast-hidden {
@@ -355,6 +373,7 @@ canvas#game {
   margin-top: 14px;
   font-size: 11px;
   letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
   text-align: center;
   color: var(--fg);
   opacity: 0.75;

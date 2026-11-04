@@ -166,6 +166,7 @@ const GLYPHS = {
 '>':['01000','00100','00010','00001','00010','00100','01000'],
 '=':['00000','11111','00000','11111','00000','00000','00000'],
 '%':['11001','11010','00100','00100','01011','10011','00000'],
+'&':['01100','10010','10100','01000','10101','10010','01101'],
 '#':['01010','11111','01010','01010','11111','01010','00000'],
 '\'':['00110','00110','00100','00000','00000','00000','00000'],
 '"':['01010','01010','01010','00000','00000','00000','00000'],
@@ -376,6 +377,7 @@ let bankEggs = 0;
 let unlockedHats = [true, false, false, false, false, false, false];
 let activeHat = 0;
 let shopSelect = 0;
+let skillsSel = 0;            // selected node index on the skills tree (Fase D)
 
 try {
   bankEggs = parseInt(localStorage.getItem(BANK_KEY) || '0', 10) || 0;
@@ -441,10 +443,132 @@ function unlockBadge(idx) {
   try { localStorage.setItem(BADGES_KEY, JSON.stringify(unlockedBadges)); } catch (e) {}
   audio.fanfare();
   showToast('🏆 UNLOCKED: ' + BADGES[idx].title);
+  addXp(25);                     // badge bounty (Fase C)
+}
+
+// ---------- player XP & level (Fase C) ----------
+const XP_KEY = 'piRunnerXp';
+
+let playerXp = 0, playerLevel = 1;
+let xpRemainder = 0;             // distance->XP fractional accumulator
+let xpRunStart = 0, levelRunStart = 1;   // for the game-over receipt
+
+// Cumulative XP required to BE level n (cost n->n+1 = 80 + 60n)
+function xpForLevel(n) { return 80 * (n - 1) + 30 * (n - 1) * n; }
+function levelFromXp(xp) { let L = 1; while (xp >= xpForLevel(L + 1)) L++; return L; }
+
+try { playerXp = parseInt(localStorage.getItem(XP_KEY) || '0', 10) || 0; } catch (e) {}
+playerLevel = levelFromXp(playerXp);
+
+function saveXp() {
+  try { localStorage.setItem(XP_KEY, String(playerXp)); } catch (e) {}
+}
+
+function addXp(amount) {
+  if (amount <= 0) return;
+  playerXp += amount;
+  const newLevel = levelFromXp(playerXp);
+  if (newLevel > playerLevel) {
+    playerLevel = newLevel;
+    milestoneBanner = { text: '★ LEVEL UP! LV ' + playerLevel + ' ★', t: 1.5 };
+    audio.fanfare();
+    vibrate(40);
+  }
+  saveXp();
+}
+
+// ---------- evolution skill tree (Fase D) ----------
+// ASCII-only English names: the 1-bit font has no accents, and the whole UI is English.
+const SKILLS_KEY = 'piRunnerSkills';
+
+const SKILL_TREE = [
+  { name: 'NEST OF EVOLUTION', cost: 50,  req: -1, x: 300, y: 70,  effect: 'ENTRY POINT. OPENS THE THREE BRANCHES.' },
+  { name: 'ARMOR FEATHERS',    cost: 120, req: 0,  x: 140, y: 130, effect: 'ONE SHIELD PER RUN ABSORBS A COLLISION.' },
+  { name: 'DOUBLE SEQUENCE',   cost: 100, req: 0,  x: 300, y: 130, effect: 'EGGS PAY 30 SCORE, COMBO LASTS 2.4S.' },
+  { name: 'ELASTIC JUMP',      cost: 100, req: 0,  x: 460, y: 130, effect: 'JUMP 6% HIGHER, LONGER JUMP BUFFER.' },
+  { name: 'ESCAPE REFLEX',     cost: 200, req: 1,  x: 140, y: 180, effect: 'AFTER A BLOCK: 2S INVINCIBLE, SPEED -10% 3S.' },
+  { name: 'BLAZING HEN',       cost: 180, req: 2,  x: 300, y: 180, effect: 'AT COMBO X8+ EGGS ARE WORTH DOUBLE.' },
+  { name: 'SLIDE BLADE',       cost: 180, req: 3,  x: 460, y: 180, effect: 'SLIDE HITBOX 20% SMALLER.' },
+  { name: 'GOLDEN HEN',        cost: 320, req: 4,  x: 140, y: 225, effect: 'SHIELD RENEWS EVERY 500M.' },
+  { name: 'PERFECT HUNT',      cost: 300, req: 5,  x: 300, y: 225, effect: 'NEAR-MISS PAYS 25 SCORE INSTEAD OF 10.' },
+  { name: 'TAIL TURBO',        cost: 300, req: 6,  x: 460, y: 225, effect: 'START AT 440 SPEED, RAMP 15% FASTER.' }
+];
+
+let skillsUnlocked = SKILL_TREE.map(() => false);
+try {
+  const su = JSON.parse(localStorage.getItem(SKILLS_KEY) || '[]');
+  if (Array.isArray(su)) for (let i = 0; i < SKILL_TREE.length; i++) skillsUnlocked[i] = !!su[i];
+} catch (e) {}
+
+function hasSkill(i) { return !!skillsUnlocked[i]; }
+function skillReady(i) { const r = SKILL_TREE[i].req; return r < 0 || skillsUnlocked[r]; }
+
+function tryUnlock(i) {
+  const n = SKILL_TREE[i];
+  if (!n || skillsUnlocked[i]) return;
+  if (!skillReady(i)) { showToast('LOCKED - UNLOCK ' + SKILL_TREE[n.req].name + ' FIRST'); return; }
+  if (playerXp < n.cost) { showToast('NEED ' + (n.cost - playerXp) + ' MORE XP'); return; }
+  playerXp -= n.cost;
+  if (levelFromXp(playerXp) < playerLevel) playerLevel = levelFromXp(playerXp); // XP is the currency
+  saveXp();
+  skillsUnlocked[i] = true;
+  try { localStorage.setItem(SKILLS_KEY, JSON.stringify(skillsUnlocked)); } catch (e) {}
+  audio.fanfare();
+  vibrate(30);
+  showToast('SKILL UNLOCKED: ' + n.name);
+}
+
+// Per-run skill timers (Fase D effects)
+let shieldCharges = 0, invT = 0, slowT = 0;
+
+// ---------- interactive tutorial (Fase E) ----------
+// Runs on the normal 'playing' state with a flag, so all physics/input is reused:
+// only spawning, collision lethality and completion are scripted.
+const TUTORIAL_KEY = 'piRunnerTutorial';
+
+let tutorial = false;         // training run active?
+let tutStep = 0;              // 0 jump | 1 slide | 2 grab egg
+let tutFlag = false;          // player performed the current step's action
+let tutOb = null;             // obstacle scripted for the current step
+let tutEggSpawned = false;
+let tutDone = false;
+try { tutDone = localStorage.getItem(TUTORIAL_KEY) === '1'; } catch (e) {}
+
+function startTutorial() {
+  resetRun();                 // also clears tutorial flags, so set them after
+  tutorial = true; tutStep = 0; tutFlag = false; tutOb = null; tutEggSpawned = false;
+}
+
+function tutAdvance() {
+  tutStep++; tutFlag = false; tutOb = null; tutEggSpawned = false; elapsed = 0;
+  audio.ding(); vibrate(25);
+  floatingTexts.push({ text: 'STEP CLEAR!', x: player.x + 30, y: player.y - 24, life: 0.9, maxLife: 0.9 });
+  if (tutStep > 2) tutorialComplete();
+}
+
+function tutorialComplete() {
+  if (!tutorial) return;
+  tutorial = false;
+  tutDone = true;
+  try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (e) {}
+  bankEggs += 50;
+  saveShopData();
+  state = 'howtoplay';
+  addXp(50);
+  audio.fanfare();
+  showToast('TUTORIAL COMPLETE +50 EGGS +50 XP');
+}
+
+// Leave training early (P / Esc): back to the reference screen, run field cleared
+function exitTutorial() {
+  if (!tutorial) return;
+  tutorial = false;
+  obstacles = []; picks = []; parts = [];
+  state = 'howtoplay';
 }
 
 // ---------- state & variables ----------
-let state = 'menu';           // menu | playing | dead | paused | howtoplay | shop | records | badges
+let state = 'menu';           // menu | playing | dead | paused | howtoplay | shop | records | badges | skills
 let score = 0, hi = 0, speed = 400, elapsed = 0;
 let nightTarget = false;
 let season = 0;               // 0: spring | 1: summer | 2: autumn | 3: winter
@@ -464,6 +588,12 @@ let eggStreak = 0, eggStreakTimer = 0;
 let milestoneBanner = null;     // { text, t }
 let floatingTexts = [];         // [{ text, x, y, life, maxLife, scale }]
 let curtainT = 0;               // dither wipe transition
+
+// ---------- arcade UI juice (Fases 1-3-5) ----------
+let stateEnterTime = 0, lastScreenState = null; // screen-entry clock for staggered menus
+let pressBox = null;            // {x,y,w,h} button currently held down (pressed look)
+let scoreShown = 0;             // slot-machine rolling score for the HUD
+let spdPulse = 0, lastSpdBars = 1, eggPulse = 0;
 
 // Active Palette
 let currentThemeKey = 'mono';
@@ -1285,7 +1415,11 @@ function crateDetail(pal, x, y, w, h) {
 }
 
 function playerBox() {
-  if (player.ducking && player.onGround) return { x: player.x + 6, y: player.y + 36, w: 54, h: 30 };
+  if (player.ducking && player.onGround) {
+    // SLIDE BLADE (8): a tighter duck hitbox slips past more close calls
+    if (hasSkill(8)) return { x: player.x + 11, y: player.y + 42, w: 43, h: 24 };
+    return { x: player.x + 6, y: player.y + 36, w: 54, h: 30 };
+  }
   return { x: player.x + 5, y: player.y + 3, w: 38, h: 61 };
 }
 function obsBox(o) { return { x: o.x + 4, y: o.y + 3, w: o.w - 8, h: o.h - 4 }; }
@@ -1330,6 +1464,13 @@ function resetRun() {
   hitstop = 0; deathFalling = false; deathLanded = false;
   stats = { cleared: 0, eggs: 0, top: 0, nearMisses: 0 };
   eggStreak = 0; eggStreakTimer = 0; milestoneBanner = null;
+  scoreShown = 0; spdPulse = 0; lastSpdBars = 1; eggPulse = 0;
+  xpRemainder = 0;
+  xpRunStart = playerXp; levelRunStart = playerLevel;
+  shieldCharges = hasSkill(1) ? 1 : 0;   // ARMOR FEATHERS (Fase D)
+  invT = 0; slowT = 0;
+  tutorial = false; tutStep = 0; tutFlag = false; tutOb = null; tutEggSpawned = false;
+  pressBox = null;
   nightTarget = false;
   season = 0;
   player.y = GROUND - STAND_H; player.vy = 0; player.onGround = true;
@@ -1343,6 +1484,7 @@ function resetRun() {
 }
 
 function die() {
+  if (tutorial) return;       // training runs never end in death (Fase E)
   state = 'dead'; deathT = 0; shake = 0; flash = 0.18;
   hitstop = 0.09;               // arcade freeze on the collision frame
   deathFalling = true; deathLanded = false;
@@ -1392,6 +1534,7 @@ function handlePointerDownButtons(pos) {
     if (pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
       audio.click();
       vibrate(15);
+      pressBox = { x: b.x, y: b.y, w: b.w, h: b.h };   // held-key look (Fase 2)
       b.onClick();
       return true;
     }
@@ -1416,10 +1559,13 @@ function copyScoreToClipboard() {
 // ---------- input handling ----------
 function pressJump() {
   audio.ensure();
+  // Training step 1 counts only when the scripted spike is already on approach
+  if (tutorial && state === 'playing' && tutStep === 0 && tutOb && tutOb.x < player.x + 500) tutFlag = true;
   if (state === 'menu') resetRun();
   else if (state === 'dead' && deathT > 0.8) resetRun();
   else if (state === 'paused') state = 'playing';
-  else if (state === 'playing') player.buffer = 0.12;
+  else if (state === 'playing') player.buffer = hasSkill(3) ? 0.17 : 0.12;   // ELASTIC JUMP (3)
+  else if (state === 'skills') tryUnlock(skillsSel);
 }
 function pressDuck() {
   audio.ensure();
@@ -1435,6 +1581,21 @@ function inSpeaker(cx, cy) {
 window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyP', 'KeyM', 'KeyT', 'KeyB', 'KeyF', 'KeyC', 'Enter'].indexOf(e.code) >= 0) e.preventDefault();
   if (e.repeat) return;
+
+  // Skills tree: arrows cycle nodes, Enter buys, Esc goes back
+  if (state === 'skills') {
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA' || e.code === 'KeyW') {
+      skillsSel = (skillsSel + SKILL_TREE.length - 1) % SKILL_TREE.length;
+      audio.blip();
+      return;
+    }
+    if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD' || e.code === 'KeyS') {
+      skillsSel = (skillsSel + 1) % SKILL_TREE.length;
+      audio.blip();
+      return;
+    }
+    if (e.code === 'Enter') { tryUnlock(skillsSel); return; }
+  }
 
   if (e.code === 'KeyC') {
     if (state === 'chickens') state = 'menu';
@@ -1477,13 +1638,15 @@ window.addEventListener('keydown', e => {
   } else if (e.code === 'KeyF') {
     toggleFullscreen();
   } else if (e.code === 'KeyP') {
+    if (tutorial) { exitTutorial(); audio.blip(); return; }
     if (state === 'playing') state = 'paused';
     else if (state === 'paused') state = 'playing';
     audio.blip();
   } else if (e.code === 'Escape') {
+    if (tutorial) { exitTutorial(); audio.blip(); return; }
     if (state === 'playing') state = 'paused';
     else if (state === 'paused') state = 'playing';
-    else if (['howtoplay', 'shop', 'records', 'badges', 'chickens'].indexOf(state) >= 0) state = 'menu';
+    else if (['howtoplay', 'shop', 'records', 'badges', 'chickens', 'skills'].indexOf(state) >= 0) state = 'menu';
     audio.blip();
   } else if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
     pressJump();
@@ -1519,6 +1682,7 @@ cv.addEventListener('pointerdown', e => {
 });
 
 window.addEventListener('pointerup', () => {
+  pressBox = null;
   if (state === 'playing' && duckHeld) duckHeld = false;
 });
 
@@ -1593,6 +1757,22 @@ if (domTouchJump) {
 function update(dt) {
   time += dt;
 
+  // Arcade UI juice: HUD pulses keep ticking (even during hitstop) ...
+  if (spdPulse > 0) spdPulse -= dt;
+  if (eggPulse > 0) eggPulse -= dt;
+
+  // ... and the score rolls toward the real value like a slot machine.
+  if (scoreShown !== score) {
+    scoreShown += (score - scoreShown) * Math.min(1, dt * 9);
+    if (Math.abs(score - scoreShown) < 1) scoreShown = score;
+  }
+
+  // Power LED on the bezel pulses fast while a run is live (Fase 1)
+  const liveRun = state === 'playing';
+  if (document.body.classList.contains('is-playing') !== liveRun) {
+    document.body.classList.toggle('is-playing', liveRun);
+  }
+
   // Hitstop: freeze the world for a few frames on big impacts (still renders)
   if (hitstop > 0) { hitstop = Math.max(0, hitstop - dt); return; }
 
@@ -1637,9 +1817,24 @@ function update(dt) {
     elapsed += dt;
     // Gentle asymptotic ramp: eases toward 940 px/s instead of hitting it ~1 min in.
     // ~550 at 2000m, ~740 at 6000m, ~840 at 10000m, never quite tops out.
-    speed = 400 + 540 * (1 - Math.exp(-score / 6000));
+    // TAIL TURBO (idx 9): higher base + 15% faster ramp; ESCAPE REFLEX slows after a block.
+    const turbo = hasSkill(9);
+    speed = (turbo ? 440 : 400) + 540 * (1 - Math.exp(-score / (turbo ? 5217 : 6000)));
+    if (slowT > 0) speed *= 0.9;
     score += speed * dt / 10;
     stats.top = Math.max(stats.top, Math.round(speed));
+
+    // Skill timers (Fase D)
+    if (invT > 0) invT -= dt;
+    if (slowT > 0) slowT -= dt;
+
+    // XP trickle: 1 XP per 10m run (Fase C)
+    xpRemainder += speed * dt / 100;
+    while (xpRemainder >= 1) { xpRemainder -= 1; addXp(1); }
+
+    // Speedometer tier-up pulse (Fase 3): flash the SPD gauge when a bar fills
+    const barsNow = Math.min(5, Math.floor(clamp((speed - 400) / 540, 0, 1) * 5) + 1);
+    if (barsNow > lastSpdBars) { lastSpdBars = barsNow; spdPulse = 0.45; }
 
     if (stats.top >= 750) unlockBadge(4); // speed demon
 
@@ -1663,6 +1858,7 @@ function update(dt) {
       audio.ding();
       vibrate(25);
       milestoneBanner = { text: '★ ' + (m * 100) + 'M REACHED! ★', t: 1.5 };
+      if (hasSkill(7) && m % 5 === 0) shieldCharges = 1;   // GOLDEN HEN: shield every 500m
     }
   }
 
@@ -1687,9 +1883,21 @@ function update(dt) {
   if (state === 'playing') {
     let rightmost = -1e9;
     for (const o of obstacles) if (o.x + o.w > rightmost) rightmost = o.x + o.w;
-    if (elapsed > 1.0 && W - rightmost > nextGap) spawnObstacle();
 
     const pb = playerBox();
+
+    // Spawning: training mode scripts one challenge at a time (Fase E)
+    if (tutorial) {
+      if (tutStep <= 1 && !tutOb && elapsed > 1.0) {
+        tutOb = makeObstacle(tutStep === 0 ? 'spike' : 'falcon', W + 40);
+        obstacles.push(tutOb);
+      }
+      if (tutStep === 2 && !tutEggSpawned && elapsed > 1.0) {
+        picks.push({ x: W + 40, y: GROUND - 70, ph: 0, t: 0 });
+        tutEggSpawned = true;
+        elapsed = 0;
+      }
+    } else if (elapsed > 1.0 && W - rightmost > nextGap) spawnObstacle();
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const o = obstacles[i];
@@ -1699,18 +1907,24 @@ function update(dt) {
       if (!o.passed && !o.nearMissed && o.x + o.w < player.x) {
         o.passed = true;
         stats.cleared++;
+        // Training step resolution: the scripted obstacle just cleared the player
+        if (tutorial && tutOb === o) {
+          if (tutFlag) tutAdvance();
+          else { tutOb = null; elapsed = 0; floatingTexts.push({ text: 'TRY AGAIN!', x: player.x + 30, y: player.y - 24, life: 0.9, maxLife: 0.9 }); audio.blip(); }
+        }
         const obBox = obsBox(o);
         const vertDist = Math.abs(pb.y + pb.h - obBox.y);
         const horizDist = Math.abs(player.x - (o.x + o.w));
         if (vertDist < 18 || (o.fly && pb.y > obBox.y + obBox.h - 16)) {
           o.nearMissed = true;
           stats.nearMisses++;
-          score += 10;
+          const nmVal = hasSkill(8) ? 25 : 10;   // PERFECT HUNT (8)
+          score += nmVal;
           flash = 0.06;
           hitstop = 0.05;           // heart-punch freeze on close calls
           audio.nearMiss();
           vibrate(15);
-          floatingTexts.push({ text: 'CLOSE! +10', x: player.x + 20, y: player.y - 10, life: 0.8, maxLife: 0.8 });
+          floatingTexts.push({ text: (hasSkill(8) ? 'PERFECT! +' : 'CLOSE! +') + nmVal, x: player.x + 20, y: player.y - 10, life: 0.8, maxLife: 0.8 });
           if (stats.nearMisses >= 3) unlockBadge(5); // close call badge
         }
       }
@@ -1727,11 +1941,20 @@ function update(dt) {
 
       if (overlap(pb, { x: p.x + 3, y: p.y + 5, w: 9, h: 9 })) {
         picks.splice(i, 1);
-        score += 25;
         stats.eggs++;
         eggStreak++;
-        eggStreakTimer = 1.8;
+        // DOUBLE SEQUENCE (2): richer eggs + longer combo window
+        let eggVal = hasSkill(2) ? 30 : 25;
+        // BLAZING HEN (5): eggs double in value once the combo reaches x8
+        if (hasSkill(5) && eggStreak >= 8) eggVal *= 2;
+        score += eggVal;
+        eggStreakTimer = hasSkill(2) ? 2.4 : 1.8;
+        eggPulse = 0.28;             // egg counter bounce (Fase 3)
+        addXp(2);                    // 2 XP per egg (Fase C)
         vibrate(15);
+
+        // Training step 3 done: grab the egg
+        if (tutorial && tutStep === 2) tutAdvance();
 
         if (eggStreak >= 2) {
           audio.streak(eggStreak);
@@ -1754,9 +1977,10 @@ function update(dt) {
     // Physics
     player.buffer = Math.max(0, player.buffer - dt);
     player.ducking = duckHeld && player.onGround;
+    if (tutorial && tutStep === 1 && player.ducking && tutOb && tutOb.x < player.x + 300) tutFlag = true;   // training step 2
 
     if (player.buffer > 0 && player.onGround) {
-      player.vy = -JUMP_V; player.onGround = false; player.buffer = 0; player.ducking = false;
+      player.vy = -Math.round(JUMP_V * (hasSkill(3) ? 1.06 : 1)); player.onGround = false; player.buffer = 0; player.ducking = false;   // ELASTIC JUMP (3)
       audio.jump();
       vibrate(10);
       for (let j = 0; j < 4; j++) parts.push({
@@ -1807,7 +2031,21 @@ function update(dt) {
 
     // Collisions
     for (const o of obstacles) {
-      if (overlap(pb, obsBox(o))) { die(); break; }
+      if (!tutorial && overlap(pb, obsBox(o))) {
+        if (invT > 0) {
+          // invincible frames: run straight through the obstacle
+        } else if (shieldCharges > 0) {
+          // ARMOR FEATHERS (1) absorbs the hit; ESCAPE REFLEX (4) upgrades the aftermath
+          shieldCharges--;
+          invT = 1.2;
+          if (hasSkill(4)) { invT = 2; slowT = 3; }
+          flash = 0.2; shake = 0.25; hitstop = 0.06;
+          audio.ding(); vibrate(30);
+          floatingTexts.push({ text: 'SHIELD BLOCK!', x: player.x + 20, y: player.y - 12, life: 0.9, maxLife: 0.9 });
+        } else {
+          die(); break;
+        }
+      }
     }
   } else if (state === 'dead') {
     deathT += dt;
@@ -1976,37 +2214,100 @@ function drawSeasonFx(pal, t, ssn) {
 // ---------- UI rendering & menus ----------
 const blinkNow = (t, period, duty) => (t % period) < duty;
 
+// Overshoot curve used by every arcade entrance (menus, HUD banner, receipt)
+function easeOutBack(k) {
+  k = clamp(k, 0, 1);
+  const c1 = 1.70158, c3 = c1 + 1, u = k - 1;
+  return 1 + c3 * u * u * u + c1 * u * u;
+}
+
+// Pixels to offset an element while it drops into place (stagger by delay)
+function enterOffset(delay, dur, st) {
+  return Math.round((1 - easeOutBack((st - delay) / dur)) * 16);
+}
+
 function drawPixelButton(pal, x, y, w, h, text, isHover) {
-  ctx.fillStyle = isHover ? pal.fg : pal.bg;
-  box(x, y, w, h);
-  ctx.fillStyle = isHover ? pal.bg : pal.fg;
-  box(x, y, w, 2); box(x, y + h - 2, w, 2);
-  box(x, y, 2, h); box(x + w - 2, y, 2, h);
-  drawText(text, x + w / 2, y + (h - 14) / 2, 2, isHover ? pal.bg : pal.fg, { align: 'center', outline: null });
+  const rx = Math.round(x), ryy = Math.round(y);
+  const held = !!pressBox && pressBox.x === rx && pressBox.y === ryy &&
+               pressBox.w === Math.round(w) && pressBox.h === Math.round(h);
+  const oy = held ? 2 : 0;                 // arcade key dip while pressed
+  const inv = isHover || held;
+
+  ctx.fillStyle = inv ? pal.fg : pal.bg;
+  box(rx, ryy + oy, w, h);
+  ctx.fillStyle = inv ? pal.bg : pal.fg;
+  box(rx, ryy + oy, w, 2); box(rx, ryy + oy + h - 2, w, 2);
+  box(rx, ryy + oy, 2, h); box(rx + w - 2, ryy + oy, 2, h);
+  drawText(text, rx + w / 2, ryy + oy + (h - 14) / 2, 2, inv ? pal.bg : pal.fg, { align: 'center', outline: null });
+
+  // Arcade selection cursor: blinking chevron to the left of the focused key
+  if (isHover && !held && blinkNow(time, 0.5, 0.34)) {
+    drawText('>', rx - 16, ryy + (h - 14) / 2, 2, pal.fg, { outline: pal.bg });
+  }
 }
 
 function drawHUD(pal, t) {
-  // Top-Right: Hi & Score
+  // Top-Right: Hi & Score (score rolls up like an arcade counter — Fase 3)
   const opts = { gap: 3, align: 'right', outline: pal.bg };
+  const liveScore = pad5(Math.floor(scoreShown));
   if (hiNew && state === 'dead' && deathT < 1.8 && Math.floor(t * 6) % 2 === 1) {
-    drawText(pad5(Math.floor(score)), W - 20, 14, 2, pal.fg, opts);
+    drawText(liveScore, W - 20, 14, 2, pal.fg, opts);
   } else {
-    drawText('HI ' + pad5(hi) + ' ' + pad5(Math.floor(score)), W - 20, 14, 2, pal.fg, opts);
+    drawText('HI ' + pad5(hi) + ' ' + liveScore, W - 20, 14, 2, pal.fg, opts);
   }
 
-  // Top-Left: Speaker icon + Live Egg Counter
+  // Top-Left: Speaker icon + Live Egg Counter (bounces on pickup)
+  const eggBob = eggPulse > 0
+    ? -Math.round(Math.sin((0.28 - eggPulse) / 0.28 * Math.PI) * 3)
+    : 0;
   drawSpeaker(pal, audio.mode);
-  drawEgg(pal, 58, 14, Math.floor(t * 4) % 2);
-  drawText('x ' + pad5(state === 'playing' ? stats.eggs : bankEggs), 82, 16, 2, pal.fg, { gap: 2, outline: pal.bg });
+  drawEgg(pal, 58, 14 + eggBob, Math.floor(t * 4) % 2);
+  drawText('x ' + pad5(state === 'playing' ? stats.eggs : bankEggs), 82, 16 + eggBob, 2, pal.fg, { gap: 2, outline: pal.bg });
 
-  // Top-Center: Speedometer / Danger Gauge
+  // Combo meter under the egg counter — fills with the streak, blinks near expiry (Fase C)
+  if (state === 'playing' && eggStreak > 0) {    const cmX = 58, cmY = 36, cmW = 108;
+    const frac = clamp(eggStreak / 10, 0, 1);
+    ctx.fillStyle = pal.fg; box(cmX, cmY, cmW, 5);
+    ctx.fillStyle = pal.bg; box(cmX + 1, cmY + 1, cmW - 2, 3);
+    ctx.fillStyle = pal.fg; box(cmX + 1, cmY + 1, Math.round((cmW - 2) * frac), 3);
+    const comboStr = 'COMBO x' + eggStreak;
+    if (eggStreakTimer < 0.5 && Math.floor(t * 8) % 2 === 0) {
+      const cw = textW(comboStr, 1, 1) + 6;
+      ctx.fillStyle = pal.fg; box(cmX + cmW + 8, cmY - 1, cw, 7);
+      drawText(comboStr, cmX + cmW + 11, cmY, 1, pal.bg);
+    } else {
+      drawText(comboStr, cmX + cmW + 11, cmY, 1, pal.fg, { outline: pal.bg });
+    }
+  }
+
+  // Interactive tutorial checklist (Fase E): live step-by-step panel
+  if (tutorial) {
+    const tx = 16, ty0 = 52, tw0 = 254, th0 = 92;
+    ctx.fillStyle = pal.fg; box(tx, ty0, tw0, th0);
+    ctx.fillStyle = pal.bg; box(tx + 2, ty0 + 2, tw0 - 4, th0 - 4);
+    drawText('TRAINING - STEP ' + Math.min(tutStep + 1, 3) + ' OF 3', tx + 10, ty0 + 8, 1, pal.fg, { gap: 2, outline: pal.bg });
+    const tutRows = ['JUMP THE SPIKE [SPACE]', 'SLIDE THE FALCON [DOWN]', 'GRAB THE EGG'];
+    tutRows.forEach((r, i) => {
+      const mark = i < tutStep ? '★ ' : (i === tutStep ? '> ' : '□ ');
+      drawText(mark + r, tx + 10, ty0 + 30 + i * 18, 1, pal.fg, { gap: 2, outline: pal.bg });
+    });
+  }
+
+  // Top-Center: Speedometer / Danger Gauge — flashes an inverted chip on tier-up
   if (state === 'playing') {
     const spdPct = clamp((speed - 400) / 540, 0, 1);
     const bars = Math.min(5, Math.floor(spdPct * 5) + 1);
     let meterStr = 'SPD [';
     for (let b = 0; b < 5; b++) meterStr += (b < bars ? '■' : '□');
     meterStr += '] ' + Math.round(speed);
-    drawText(meterStr, W / 2, 14, 2, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
+    const mw = textW(meterStr, 2, 2);
+    if (spdPulse > 0 && Math.floor(t * 20) % 2 === 0) {
+      ctx.fillStyle = pal.fg;
+      box(W / 2 - mw / 2 - 8, 8, mw + 16, 22);
+      drawText(meterStr, W / 2, 14, 2, pal.bg, { align: 'center', gap: 2, outline: pal.fg });
+    } else {
+      drawText(meterStr, W / 2, 14, 2, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
+    }
   }
 
   // Flying Danger Telegraph on Right Edge (falcon / owl)
@@ -2025,22 +2326,41 @@ function drawHUD(pal, t) {
     }
   }
 
-  // Milestone Banner
+  // Milestone Banner — drops in with overshoot, blinks out like a marquee
   if (milestoneBanner) {
     const bx = W / 2 - 160, by = 60, bw = 320, bh = 28;
-    ctx.fillStyle = pal.bg; box(bx, by, bw, bh);
-    ctx.fillStyle = pal.fg;
-    box(bx, by, bw, 3); box(bx, by + bh - 3, bw, 3);
-    box(bx, by, 3, bh); box(bx + bw - 3, by, 3, bh);
-    drawText(milestoneBanner.text, W / 2, by + 7, 2, pal.fg, { align: 'center', gap: 3 });
+    const age = 1.5 - milestoneBanner.t;
+    const dy = enterOffset(0, 0.3, age);
+    const exiting = milestoneBanner.t < 0.3;
+    if (!(exiting && Math.floor(t * 16) % 2 === 0)) {
+      ctx.fillStyle = pal.bg; box(bx, by + dy, bw, bh);
+      ctx.fillStyle = pal.fg;
+      box(bx, by + dy, bw, 3); box(bx, by + dy + bh - 3, bw, 3);
+      box(bx, by + dy, 3, bh); box(bx + bw - 3, by + dy, 3, bh);
+      drawText(milestoneBanner.text, W / 2, by + dy + 7, 2, pal.fg, { align: 'center', gap: 3 });
+    }
   }
 
-  // Floating Texts (Near-miss, egg streaks)
+  // Floating Texts (Near-miss, egg streaks) — punch in one scale bigger
   for (const ft of floatingTexts) {
     const alphaFrac = ft.life / ft.maxLife;
     if (alphaFrac < 0.3 && Math.floor(t * 16) % 2 === 1) continue;
-    drawText(ft.text, ft.x, ft.y, 2, pal.fg, { align: 'center', outline: pal.bg });
+    const sc = ft.life > ft.maxLife - 0.14 ? 3 : 2;
+    drawText(ft.text, ft.x, ft.y, sc, pal.fg, { align: 'center', gap: sc, outline: pal.bg });
   }
+
+  // Player level chip + XP bar along the bottom edge (Fase C)
+  const xpNeed = xpForLevel(playerLevel + 1) - xpForLevel(playerLevel);
+  const xpHave = playerXp - xpForLevel(playerLevel);
+  const xpFrac = clamp(xpHave / xpNeed, 0, 1);
+  ctx.fillStyle = pal.fg; box(0, H - 4, W, 4);
+  ctx.fillStyle = pal.bg; box(1, H - 3, W - 2, 2);
+  ctx.fillStyle = pal.fg; box(1, H - 3, Math.round((W - 2) * xpFrac), 2);
+  drawText('LV ' + playerLevel, 8, H - 18, 1, pal.fg, { outline: pal.bg });
+  if (state === 'playing' && shieldCharges > 0) {
+    drawText('SHIELD READY', 8, H - 30, 1, pal.fg, { outline: pal.bg });
+  }
+  drawText(xpHave + '/' + xpNeed + ' XP', W - 8, H - 18, 1, pal.fg, { align: 'right', outline: pal.bg });
 }
 
 function drawSpeaker(pal, mode) {
@@ -2064,40 +2384,54 @@ function drawSpeaker(pal, mode) {
 function drawScreens(pal, t) {
   clearButtons();
 
-  if (state === 'menu') {
-    drawText('CHICKEN RUNNER', W / 2, 40, 5, pal.fg, { gap: 8, align: 'center', outline: pal.bg });
-    const seasonsList = ['SPRING 🌸', 'SUMMER ☀️', 'AUTUMN 🍂', 'WINTER ❄️'];
-    drawText('WORLD // ' + seasonsList[season], W / 2, 84, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+  // Screen-entry clock: every screen bounces in, staggered (Fase 2)
+  if (state !== lastScreenState) { lastScreenState = state; stateEnterTime = time; }
+  const st = time - stateEnterTime;
 
-    // Menu Buttons — width auto-fits the longest label (drawn at scale 2)
-    const btnH = 24, step = 27, startY = 100;
+  if (state === 'menu') {
+    // Inverted arcade nameplate: the marquee title breathes on a solid plate
+    const gapT = 8 + Math.round(Math.sin(t * 1.8));
+    const titleStr = 'CHICKEN RUNNER';
+    const tw = textW(titleStr, 5, gapT);
+    const ty = 36 + enterOffset(0, 0.4, st);
+    const px = Math.round(W / 2 - tw / 2 - 12), py = ty - 6, pw = Math.round(tw + 24), ph = 47;
+    ditherRect(pal, px + 6, py + 6, pw, ph);          // dithered drop shadow
+    ctx.fillStyle = pal.fg; box(px, py, pw, ph);       // the plate
+    drawText(titleStr, W / 2, ty, 5, pal.bg, { gap: gapT, align: 'center' });
+
+    // Menu Buttons — words only (no numbers), width auto-fits the longest label
+    const btnH = 22, step = 24, startY = 92;
     const items = [
-      { id: 'btn_play',    label: '1. START RUN', action: () => resetRun() },
-      { id: 'btn_roster',  label: '2. CHICKEN: ' + CHICKENS[activeChicken].name, action: () => { state = 'chickens'; rosterSelect = activeChicken; } },
-      { id: 'btn_shop',    label: '3. HAT SHOP', action: () => { state = 'shop'; shopSelect = activeHat; } },
-      { id: 'btn_help',    label: '4. HOW TO PLAY', action: () => { state = 'howtoplay'; } },
-      { id: 'btn_rec',     label: '5. HALL OF FAME', action: () => { state = 'records'; } },
-      { id: 'btn_badg',    label: '6. BADGES', action: () => { state = 'badges'; } }
+      { id: 'btn_play',    label: 'START RUN', action: () => resetRun() },
+      { id: 'btn_roster',  label: 'CHICKEN: ' + CHICKENS[activeChicken].name, action: () => { state = 'chickens'; rosterSelect = activeChicken; } },
+      { id: 'btn_shop',    label: 'HAT SHOP', action: () => { state = 'shop'; shopSelect = activeHat; } },
+      { id: 'btn_skills',  label: 'SKILLS', action: () => { state = 'skills'; skillsSel = 0; } },
+      { id: 'btn_help',    label: 'HOW TO PLAY', action: () => { state = 'howtoplay'; } },
+      { id: 'btn_rec',     label: 'HALL OF FAME', action: () => { state = 'records'; } },
+      { id: 'btn_badg',    label: 'BADGES', action: () => { state = 'badges'; } }
     ];
     const btnW = Math.max(260, Math.max(...items.map(it => textW(it.label, 2, 2))) + 28);
     const bx = W / 2 - btnW / 2;
-    const listH = (items.length - 1) * step + btnH;   // 100..259
+    const listH = (items.length - 1) * step + btnH;   // 92..263
 
-    // Framed panel behind the list
+    // Framed panel behind the list, with a dithered drop shadow (arcade depth)
+    ditherRect(pal, bx, startY, btnW + 10, listH + 10);
     ctx.fillStyle = pal.fg; box(bx - 5, startY - 5, btnW + 10, listH + 10);
     ctx.fillStyle = pal.bg; box(bx - 2, startY - 2, btnW + 4, listH + 4);
 
     items.forEach((item, idx) => {
-      const by = startY + idx * step;
+      const by = startY + idx * step + enterOffset(0.12 + idx * 0.05, 0.3, st);
       addButton(item.id, bx, by, btnW, btnH, item.action, item.label);
       drawPixelButton(pal, bx, by, btnW, btnH, item.label, hoveredBtn === item.id);
     });
 
     if (blinkNow(t, 1.3, 0.85)) {
-      drawText('[PRESS SPACE / TAP TO RUN · C FOR CHICKENS]', W / 2, 267, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+      const seasonsList = ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER'];
+      drawText('WORLD // ' + seasonsList[season] + ' - SPACE TO RUN - C FOR CHICKENS',
+        W / 2, 267, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
     }
   } else if (state === 'chickens') {
-    drawText('// CHOOSE YOUR CHICKEN //', W / 2, 24, 3, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('// CHOOSE YOUR CHICKEN //', W / 2, 24 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
     drawText('ROOSTER ROSTER [' + (rosterSelect + 1) + ' / ' + CHICKENS.length + ']', W / 2, 48, 2, pal.fg, { align: 'center', outline: pal.bg });
 
     const c = CHICKENS[rosterSelect];
@@ -2151,7 +2485,15 @@ function drawScreens(pal, t) {
     addButton('btn_c_back', W / 2 - 70, 242, 140, 26, () => { state = 'menu'; }, 'BACK');
     drawPixelButton(pal, W / 2 - 70, 242, 140, 26, '< BACK', hoveredBtn === 'btn_c_back');
   } else if (state === 'howtoplay') {
-    drawText('// HOW TO PLAY //', W / 2, 30, 3, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('// HOW TO PLAY //', W / 2, 30 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
+
+    // Training call-to-action: shows the reward, or the completion stamp (Fase E)
+    const howEnter = enterOffset(0.1, 0.3, st);
+    if (tutDone) {
+      drawText('★ TRAINING COMPLETE - REWARD CLAIMED ★', W / 2, 56 + howEnter, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+    } else {
+      drawText('TRAINING REWARD: +50 EGGS +50 XP', W / 2, 56 + howEnter, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+    }
 
     // Section 1: Jump
     drawText('▲ JUMP [SPACE / UP / RIGHT TAP]', 90, 80, 2, pal.fg, { outline: pal.bg });
@@ -2165,42 +2507,75 @@ function drawScreens(pal, t) {
     drawText('🥚 COLLECT EGGS & NEAR-MISS', 90, 188, 2, pal.fg, { outline: pal.bg });
     drawText('CHAIN EGGS FOR STREAKS & BUY HATS IN SHOP', 90, 210, 1, pal.fg, { outline: pal.bg });
 
-    // Back button
-    addButton('btn_back', W / 2 - 70, 240, 140, 28, () => { state = 'menu'; }, 'BACK');
-    drawPixelButton(pal, W / 2 - 70, 240, 140, 28, '< BACK', hoveredBtn === 'btn_back');
-  } else if (state === 'shop') {
-    drawText('// 1-BIT HAT BOUTIQUE //', W / 2, 30, 3, pal.fg, { align: 'center', outline: pal.bg });
-    drawText('BANK: ' + pad5(bankEggs) + ' EGGS', W / 2, 60, 2, pal.fg, { align: 'center', outline: pal.bg });
+    // Practice (interactive tutorial) + Back
+    const howBtnY = 240;
+    addButton('btn_train', W / 2 - 175, howBtnY, 160, 28, () => startTutorial(), 'TRAINING');
+    drawPixelButton(pal, W / 2 - 175, howBtnY, 160, 28, tutDone ? 'TRAINING ★' : 'TRAINING', hoveredBtn === 'btn_train');
 
-    // Central Preview Stage
+    addButton('btn_back', W / 2 + 15, howBtnY, 160, 28, () => { state = 'menu'; }, 'BACK');
+    drawPixelButton(pal, W / 2 + 15, howBtnY, 160, 28, '< BACK', hoveredBtn === 'btn_back');
+  } else if (state === 'shop') {
+    drawText('// 1-BIT HAT BOUTIQUE //', W / 2, 30 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
+
+    // Product-style layout: preview stage (left) + hat showcase card (right)
     const hat = HATS[shopSelect];
     const isUnlocked = unlockedHats[shopSelect];
     const isEquipped = activeHat === shopSelect;
 
-    ctx.fillStyle = pal.fg;
-    box(W / 2 - 120, 80, 240, 110);
-    ctx.fillStyle = pal.bg;
-    box(W / 2 - 116, 84, 232, 102);
+    drawText('BANK: ' + pad5(bankEggs) + ' EGGS', W / 2, 56, 2, pal.fg, { align: 'center', outline: pal.bg });
 
-    // Draw preview chicken standing with the currently selected hat
-    const prevX = W / 2 - STAND_W / 2;
-    const prevY = 100;
+    // --- Preview stage: chicken wearing the hat, with headroom for tall hats ---
+    const sbX = 234, sbY = 74, sbW = 260, sbH = 116;
+    ctx.fillStyle = pal.fg;
+    box(sbX, sbY, sbW, sbH);
+    ctx.fillStyle = pal.bg;
+    box(sbX + 3, sbY + 3, sbW - 6, sbH - 6);
+
+    // Ground line inside the stage (chicken stands on it)
+    ctx.fillStyle = pal.fg;
+    box(sbX + sbW / 2 - 70, sbY + 96, 140, 2);
+
+    // Hat top sits at prevY-18 => 86, i.e. 12px clear of the frame (was touching it)
+    const prevX = sbX + sbW / 2 - STAND_W / 2;
+    const prevY = sbY + 96 - STAND_H;
     drawChicken(pal, prevX, prevY, 'run', Math.floor(t * 8) % 2, false, activeChicken, shopSelect);
 
-    // Hat Details
-    drawText(hat.name, W / 2, 160, 2, pal.fg, { align: 'center' });
-    drawText(hat.desc, W / 2, 178, 1, pal.fg, { align: 'center' });
+    // --- Showcase card: enlarged hat + name + blurb + status ---
+    const fx = 506, fy = 74, fw = 220, fh = 116;
+    ctx.fillStyle = pal.fg;
+    box(fx, fy, fw, fh);
+    ctx.fillStyle = pal.bg;
+    box(fx + 3, fy + 3, fw - 6, fh - 6);
 
-    // Prev / Next Buttons
-    addButton('btn_prev', W / 2 - 190, 116, 50, 36, () => {
+    if (shopSelect === 0) {
+      drawText('( NO HAT )', fx + fw / 2, fy + 26, 2, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
+      drawText('CLASSIC BAREHEAD', fx + fw / 2, fy + 52, 1, pal.fg, { align: 'center', outline: pal.bg });
+    } else {
+      // Integer-scale zoom (2x) keeps the pixels crisp — grayCount stays 0.
+      // y+42: tallest hats (TOP HAT/CHEF) clear the frame by 3px; the name below
+      // sits at y+73 so the GRAD CAP tassel keeps 2px of air before the text.
+      ctx.save();
+      ctx.translate(fx + fw / 2 - 42, fy + 42);
+      ctx.scale(2, 2);
+      drawHat(pal, shopSelect, 0, 0, 'run', 0, activeChicken);
+      ctx.restore();
+    }
+
+    drawText(hat.name, fx + fw / 2, fy + 73, 2, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(hat.desc, fx + fw / 2, fy + 89, 1, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(isEquipped ? 'EQUIPPED - LOOKING GOOD' : isUnlocked ? 'OWNED - READY TO EQUIP' : 'LOCKED - COST ' + hat.cost + ' EGGS',
+      fx + fw / 2, fy + 103, 1, pal.fg, { align: 'center', outline: pal.bg });
+
+    // Prev / Next Buttons (outside both frames)
+    addButton('btn_prev', sbX - 60, sbY + 40, 50, 36, () => {
       shopSelect = (shopSelect - 1 + HATS.length) % HATS.length;
     }, '<');
-    drawPixelButton(pal, W / 2 - 190, 116, 50, 36, '<', hoveredBtn === 'btn_prev');
+    drawPixelButton(pal, sbX - 60, sbY + 40, 50, 36, '<', hoveredBtn === 'btn_prev');
 
-    addButton('btn_next', W / 2 + 140, 116, 50, 36, () => {
+    addButton('btn_next', fx + fw + 10, sbY + 40, 50, 36, () => {
       shopSelect = (shopSelect + 1) % HATS.length;
     }, '>');
-    drawPixelButton(pal, W / 2 + 140, 116, 50, 36, '>', hoveredBtn === 'btn_next');
+    drawPixelButton(pal, fx + fw + 10, sbY + 40, 50, 36, '>', hoveredBtn === 'btn_next');
 
     // Purchase / Equip Button
     let actionLabel = isEquipped ? 'EQUIPPED' : isUnlocked ? 'EQUIP' : 'BUY (' + hat.cost + ' EGGS)';
@@ -2228,7 +2603,7 @@ function drawScreens(pal, t) {
     addButton('btn_shop_back', W / 2 - 70, 244, 140, 26, () => { state = 'menu'; }, 'BACK');
     drawPixelButton(pal, W / 2 - 70, 244, 140, 26, '< BACK', hoveredBtn === 'btn_shop_back');
   } else if (state === 'records') {
-    drawText('// HALL OF FAME //', W / 2, 30, 3, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('// HALL OF FAME //', W / 2, 30 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
 
     const rx = W / 2 - 200, ry = 66;
     drawText('RANK   DISTANCE   EGGS   DATE', rx, ry, 2, pal.fg, { gap: 2, outline: pal.bg });
@@ -2246,7 +2621,7 @@ function drawScreens(pal, t) {
     addButton('btn_rec_back', W / 2 - 70, 236, 140, 28, () => { state = 'menu'; }, 'BACK');
     drawPixelButton(pal, W / 2 - 70, 236, 140, 28, '< BACK', hoveredBtn === 'btn_rec_back');
   } else if (state === 'badges') {
-    drawText('// RETRO ACHIEVEMENTS //', W / 2, 28, 3, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('// RETRO ACHIEVEMENTS //', W / 2, 28 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
 
     const colW = 380, startY = 64;
     BADGES.forEach((b, idx) => {
@@ -2268,9 +2643,96 @@ function drawScreens(pal, t) {
 
     addButton('btn_badg_back', W / 2 - 70, 236, 140, 28, () => { state = 'menu'; }, 'BACK');
     drawPixelButton(pal, W / 2 - 70, 236, 140, 28, '< BACK', hoveredBtn === 'btn_badg_back');
+  } else if (state === 'skills') {
+    drawText('// EVOLUTION SKILLS //', W / 2, 14 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
+
+    const NODE_W = 132, NODE_H = 26;
+    const showIdx = (hoveredBtn && hoveredBtn.indexOf('sk_') === 0)
+      ? parseInt(hoveredBtn.slice(3), 10) : skillsSel;
+
+    // --- connectors first, so the node boxes sit on top ---
+    ctx.fillStyle = pal.fg;
+    box(299, 83, 2, 17);                       // root -> branch bar
+    box(140, 99, 321, 2);                      // branch bar
+    for (const col of [140, 300, 460]) {
+      box(col - 1, 100, 2, 17);                // bar -> row 1
+      box(col - 1, 143, 2, 24);                // row 1 -> row 2
+      box(col - 1, 193, 2, 19);                // row 2 -> row 3
+    }
+
+    // --- nodes ---
+    SKILL_TREE.forEach((n, i) => {
+      const nx = Math.round(n.x - NODE_W / 2), ny = Math.round(n.y - NODE_H / 2);
+      const un = skillsUnlocked[i], ready = skillReady(i);
+
+      if (un) {
+        ctx.fillStyle = pal.fg; box(nx, ny, NODE_W, NODE_H);
+      } else {
+        ctx.fillStyle = pal.bg; box(nx, ny, NODE_W, NODE_H);
+        ctx.fillStyle = pal.fg;
+        if (ready) {
+          box(nx, ny, NODE_W, 2); box(nx, ny + NODE_H - 2, NODE_W, 2);
+          box(nx, ny, 2, NODE_H); box(nx + NODE_W - 2, ny, 2, NODE_H);
+        } else {
+          // dashed border = still locked behind its parent
+          for (let d = 0; d < NODE_W; d += 8) { box(nx + d, ny, 4, 2); box(nx + d, ny + NODE_H - 2, 4, 2); }
+          for (let d = 0; d < NODE_H; d += 8) { box(nx, ny + d, 2, 4); box(nx + NODE_W - 2, ny + d, 2, 4); }
+        }
+      }
+
+      drawText(n.name, n.x, n.y - 3, 1, un ? pal.bg : pal.fg,
+        { align: 'center', outline: un ? null : pal.bg });
+
+      // Focus ring (keyboard selection or mouse hover): corner ticks
+      if (showIdx === i) {
+        ctx.fillStyle = pal.fg;
+        const kx = nx - 4, ky = ny - 4, kw = NODE_W + 8, kh = NODE_H + 8;
+        box(kx, ky, 6, 2); box(kx, ky, 2, 6);
+        box(kx + kw - 6, ky, 6, 2); box(kx + kw - 2, ky, 2, 6);
+        box(kx, ky + kh - 2, 6, 2); box(kx, ky + kh - 6, 2, 6);
+        box(kx + kw - 6, ky + kh - 2, 6, 2); box(kx + kw - 2, ky + kh - 6, 2, 6);
+      }
+
+      addButton('sk_' + i, nx, ny, NODE_W, NODE_H, () => { skillsSel = i; tryUnlock(i); }, n.name);
+    });
+
+    // --- description card (right half) ---
+    const n = SKILL_TREE[showIdx];
+    const un = skillsUnlocked[showIdx], ready = skillReady(showIdx);
+    const cx0 = 580, cy0 = 56, cw = 350, ch = 176;
+    ditherRect(pal, cx0 + 6, cy0 + 6, cw, ch);
+    ctx.fillStyle = pal.fg; box(cx0, cy0, cw, ch);
+    ctx.fillStyle = pal.bg; box(cx0 + 3, cy0 + 3, cw - 6, ch - 6);
+
+    drawText(n.name, cx0 + cw / 2, cy0 + 12, 2, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(un ? 'STATUS: UNLOCKED' : ready ? 'STATUS: READY TO BUY' : 'STATUS: LOCKED',
+      cx0 + cw / 2, cy0 + 38, 1, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('COST ' + n.cost + ' XP - YOUR XP ' + playerXp,
+      cx0 + cw / 2, cy0 + 54, 1, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(n.req >= 0 ? 'REQUIRES ' + SKILL_TREE[n.req].name : 'ENTRY POINT - NO PREREQ',
+      cx0 + cw / 2, cy0 + 68, 1, pal.fg, { align: 'center', outline: pal.bg });
+
+    // Effect text, hand-wrapped (scale 1, pitch ~6px, ~46 chars per line)
+    const words = n.effect.split(' ');
+    const lines = []; let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length > 46) { lines.push(cur.trim()); cur = w; }
+      else cur += ' ' + w;
+    }
+    if (cur.trim()) lines.push(cur.trim());
+    lines.forEach((ln, li) => {
+      drawText(ln, cx0 + cw / 2, cy0 + 88 + li * 14, 1, pal.fg, { align: 'center', outline: pal.bg });
+    });
+
+    const btnLabel = un ? '★ UNLOCKED ★' : 'UNLOCK - ' + n.cost + ' XP';
+    addButton('btn_sk_unlock', cx0 + 60, cy0 + 140, 230, 26, () => tryUnlock(showIdx), btnLabel);
+    drawPixelButton(pal, cx0 + 60, cy0 + 140, 230, 26, btnLabel, hoveredBtn === 'btn_sk_unlock');
+
+    addButton('btn_sk_back', 40, 246, 120, 26, () => { state = 'menu'; }, 'BACK');
+    drawPixelButton(pal, 40, 246, 120, 26, '< BACK', hoveredBtn === 'btn_sk_back');
   } else if (state === 'paused') {
     ditherRect(pal, 0, 0, W, H, true);
-    drawText('PAUSED', W / 2, 40, 4, pal.fg, { gap: 8, align: 'center', outline: pal.bg });
+    drawText('PAUSED', W / 2, 40 + enterOffset(0, 0.3, st), 4, pal.fg, { gap: 8, align: 'center', outline: pal.bg });
 
     const btnW = 180, btnH = 28, startY = 96;
     const pItems = [
@@ -2286,13 +2748,17 @@ function drawScreens(pal, t) {
 
     pItems.forEach((item, idx) => {
       const bx = W / 2 - btnW / 2;
-      const by = startY + idx * 34;
+      const by = startY + idx * 34 + enterOffset(0.08 + idx * 0.045, 0.3, st);
       addButton(item.id, bx, by, btnW, btnH, item.action, item.label);
       drawPixelButton(pal, bx, by, btnW, btnH, item.label, hoveredBtn === item.id);
     });
   } else if (state === 'dead' && deathT > 0.8) {
+    // "Printing" clock: the receipt types itself out after the death anim
+    const rst = deathT - 0.8;
+
     // Arcade Receipt / Scorecard Frame
     const rw = 440, rh = 186, rx = W / 2 - rw / 2, ry = 24;
+    ditherRect(pal, rx + 6, ry + 6, rw, rh);          // dithered drop shadow
     ctx.fillStyle = pal.bg; box(rx, ry, rw, rh);
     ctx.fillStyle = pal.fg;
     box(rx, ry, rw, 3); box(rx, ry + rh - 3, rw, 3);
@@ -2304,10 +2770,18 @@ function drawScreens(pal, t) {
       box(px, ry + rh, 8, 3);
     }
 
+    // Plain header first, then the NEW HI stamp slams down on top of it
+    drawText('--- RUN SUMMARY RECEIPT ---', W / 2, ry + 12 + enterOffset(0, 0.3, rst), 2, pal.fg, { align: 'center', outline: pal.bg });
     if (hiNew) {
-      drawText('★ NEW HIGH SCORE RECORD! ★', W / 2, ry + 12, 2, pal.fg, { align: 'center', outline: pal.bg });
-    } else {
-      drawText('--- RUN SUMMARY RECEIPT ---', W / 2, ry + 12, 2, pal.fg, { align: 'center', outline: pal.bg });
+      const k = clamp((rst - 0.45) / 0.3, 0, 1);
+      if (k > 0) {
+        const stamp = '★ NEW HIGH SCORE! ★';
+        const sw = textW(stamp, 2, 2);
+        const sy = ry + 5 + Math.round((1 - easeOutBack(k)) * 26);
+        ctx.fillStyle = pal.fg;
+        box(W / 2 - sw / 2 - 8, sy, sw + 16, 20);
+        drawText(stamp, W / 2, sy + 3, 2, pal.bg, { align: 'center', gap: 2 });
+      }
     }
 
     box(rx + 16, ry + 32, rw - 32, 2);
@@ -2318,29 +2792,48 @@ function drawScreens(pal, t) {
       ['OBSTACLES CLEARED', pad5(stats.cleared)],
       ['EGGS COLLECTED', pad5(stats.eggs)],
       ['TOP VELOCITY', stats.top + ' PX/S'],
-      ['TOTAL BANK EGGS', pad5(bankEggs)]
+      ['TOTAL BANK EGGS', pad5(bankEggs)],
+      ['XP EARNED', '+' + (playerXp - xpRunStart)],
+      ['LEVEL', levelRunStart + ' > ' + playerLevel]
     ];
 
+    // Rows print one after another; the distance rolls up like a slot machine
+    const rollK = clamp((rst - 0.18) / 0.6, 0, 1);
+    const distRoll = Math.floor(score * (1 - Math.pow(1 - rollK, 3)));
+
     statRows.forEach(([lbl, val], idx) => {
-      drawText(lbl, leftX, ry + 44 + idx * 18, 1, pal.fg);
-      drawText(val, rightX, ry + 44 + idx * 18, 1, pal.fg, { align: 'right' });
+      const delay = 0.14 + idx * 0.07;
+      if (rst < delay) return;
+      const dy = enterOffset(delay, 0.24, rst);
+      drawText(lbl, leftX, ry + 42 + idx * 15 + dy, 1, pal.fg);
+      const shown = idx === 0 ? pad5(distRoll) + ' M' : val;
+      drawText(shown, rightX, ry + 42 + idx * 15 + dy, 1, pal.fg, { align: 'right' });
     });
 
     box(rx + 16, ry + 140, rw - 32, 2);
 
-    // Action Buttons
-    addButton('btn_again', rx + 24, ry + 148, 120, 28, () => resetRun(), 'PLAY AGAIN');
-    drawPixelButton(pal, rx + 24, ry + 148, 120, 28, 'AGAIN', hoveredBtn === 'btn_again');
+    // Action Buttons — drop in last, once the receipt has finished printing
+    if (rst > 0.7) {
+      const bdy = enterOffset(0.7, 0.3, rst);
+      addButton('btn_again', rx + 24, ry + 148 + bdy, 120, 28, () => resetRun(), 'PLAY AGAIN');
+      drawPixelButton(pal, rx + 24, ry + 148 + bdy, 120, 28, 'AGAIN', hoveredBtn === 'btn_again');
 
-    addButton('btn_share', rx + 158, ry + 148, 130, 28, () => copyScoreToClipboard(), 'COPY SCORE');
-    drawPixelButton(pal, rx + 158, ry + 148, 130, 28, 'COPY SCORE', hoveredBtn === 'btn_share');
+      addButton('btn_share', rx + 158, ry + 148 + bdy, 130, 28, () => copyScoreToClipboard(), 'COPY SCORE');
+      drawPixelButton(pal, rx + 158, ry + 148 + bdy, 130, 28, 'COPY SCORE', hoveredBtn === 'btn_share');
 
-    addButton('btn_d_menu', rx + 302, ry + 148, 114, 28, () => { state = 'menu'; }, 'MENU');
-    drawPixelButton(pal, rx + 302, ry + 148, 114, 28, 'MENU', hoveredBtn === 'btn_d_menu');
+      addButton('btn_d_menu', rx + 302, ry + 148 + bdy, 114, 28, () => { state = 'menu'; }, 'MENU');
+      drawPixelButton(pal, rx + 302, ry + 148 + bdy, 114, 28, 'MENU', hoveredBtn === 'btn_d_menu');
+    }
 
     if (deathT > 1.3 && blinkNow(t, 1.3, 0.85)) {
       drawText('[SPACE / TAP TO REPLAY]', W / 2, 236, 2, pal.fg, { align: 'center', outline: pal.bg });
     }
+  }
+
+  // Training always gets a touch-friendly exit (P only exists on keyboards)
+  if (tutorial) {
+    addButton('btn_tut_exit', W - 92, 56, 76, 24, () => exitTutorial(), 'EXIT');
+    drawPixelButton(pal, W - 92, 56, 76, 24, 'EXIT', hoveredBtn === 'btn_tut_exit');
   }
 }
 
@@ -2367,7 +2860,7 @@ function drawPlayer(pal, t) {
     // Orbit centre = the seated head (sprite y2..6 → screen GROUND-30..-18, x≈bx+30)
     const hx = bx + 30, hy = GROUND - 30;
     for (const f of deathStars) {
-      const sx = hx + Math.cos(f.a) * f.r, sy = hy + Math.sin(f.a) * f.r * 0.55;
+      const sx = Math.round(hx + Math.cos(f.a) * f.r), sy = Math.round(hy + Math.sin(f.a) * f.r * 0.55);
       drawText('★', sx, sy, 1, pal.fg, { align: 'center', outline: pal.bg });
     }
     return;

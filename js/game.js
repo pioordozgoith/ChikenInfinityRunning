@@ -91,7 +91,7 @@ const CHICKENS = [
   {
     id: 'shinobi',
     name: 'SHINOBI HEN',
-    title: 'THE SHADOW PEK',
+    title: 'THE SHADOW PECK',
     desc: 'SILENT AS A FEATHER. DASHES THROUGH THE SHADOWS.'
   }
 ];
@@ -206,6 +206,20 @@ function drawText(str, x, y, scale, color, opts) {
 }
 const pad5 = n => String(Math.min(Math.max(n, 0), 999999)).padStart(5, '0');
 
+// Word-wrap a string to a pixel width (used by the roster description card)
+function wrapText(str, maxPx, scale, gap) {
+  const words = str.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (cur && textW(test, scale, gap) > maxPx) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 // ---------- helpers ----------
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -274,7 +288,7 @@ const audio = {
   updateDomBtn() {
     const btn = document.getElementById('btn-audio');
     if (!btn) return;
-    btn.textContent = this.mode === 0 ? '🔊 ALL' : this.mode === 1 ? '🎵 SFX' : '🔇 OFF';
+    btn.textContent = this.mode === 0 ? 'SOUND ALL' : this.mode === 1 ? 'SOUND SFX' : 'SOUND OFF';
   },
 
   tone(f0, f1, dur, type, vol, delay, bus) {
@@ -378,6 +392,7 @@ let unlockedHats = [true, false, false, false, false, false, false];
 let activeHat = 0;
 let shopSelect = 0;
 let skillsSel = 0;            // selected node index on the skills tree (Fase D)
+let skillsConfirm = -1;       // node awaiting a 2nd activation (XP spend is irreversible)
 
 try {
   bankEggs = parseInt(localStorage.getItem(BANK_KEY) || '0', 10) || 0;
@@ -427,7 +442,7 @@ const BADGES = [
   { id: 'first_run',    title: 'FIRST FLIGHT', desc: 'COMPLETE YOUR 1ST RUN' },
   { id: 'night_owl',    title: 'NIGHT OWL',    desc: 'SURVIVE INTO THE NIGHT' },
   { id: 'four_seasons', title: 'FOUR SEASONS', desc: 'REACH THE WINTER SNOW' },
-  { id: 'egg_magnate',  title: 'EGG MAGNATE',  desc: 'BANK 50 TOTAL EGGS' },
+  { id: 'egg_magnate',  title: 'STAR MAGNATE',  desc: 'BANK 50 TOTAL STARS' },
   { id: 'speed_demon',  title: 'SPEED DEMON',  desc: 'EXCEED 750 PX/S VELOCITY' },
   { id: 'close_call',   title: 'CLOSE CALL',   desc: 'SCORE 3 NEAR-MISS DODGES' }
 ];
@@ -442,7 +457,7 @@ function unlockBadge(idx) {
   unlockedBadges[idx] = true;
   try { localStorage.setItem(BADGES_KEY, JSON.stringify(unlockedBadges)); } catch (e) {}
   audio.fanfare();
-  showToast('🏆 UNLOCKED: ' + BADGES[idx].title);
+  showToast('★ UNLOCKED: ' + BADGES[idx].title);
   addXp(25);                     // badge bounty (Fase C)
 }
 
@@ -484,10 +499,10 @@ const SKILLS_KEY = 'piRunnerSkills';
 const SKILL_TREE = [
   { name: 'NEST OF EVOLUTION', cost: 50,  req: -1, x: 300, y: 70,  effect: 'ENTRY POINT. OPENS THE THREE BRANCHES.' },
   { name: 'ARMOR FEATHERS',    cost: 120, req: 0,  x: 140, y: 130, effect: 'ONE SHIELD PER RUN ABSORBS A COLLISION.' },
-  { name: 'DOUBLE SEQUENCE',   cost: 100, req: 0,  x: 300, y: 130, effect: 'EGGS PAY 30 SCORE, COMBO LASTS 2.4S.' },
+  { name: 'DOUBLE SEQUENCE',   cost: 100, req: 0,  x: 300, y: 130, effect: 'STARS PAY 30 SCORE, COMBO LASTS 2.4S.' },
   { name: 'ELASTIC JUMP',      cost: 100, req: 0,  x: 460, y: 130, effect: 'JUMP 6% HIGHER, LONGER JUMP BUFFER.' },
   { name: 'ESCAPE REFLEX',     cost: 200, req: 1,  x: 140, y: 180, effect: 'AFTER A BLOCK: 2S INVINCIBLE, SPEED -10% 3S.' },
-  { name: 'BLAZING HEN',       cost: 180, req: 2,  x: 300, y: 180, effect: 'AT COMBO X8+ EGGS ARE WORTH DOUBLE.' },
+  { name: 'BLAZING HEN',       cost: 180, req: 2,  x: 300, y: 180, effect: 'AT COMBO X8+ STARS ARE WORTH DOUBLE.' },
   { name: 'SLIDE BLADE',       cost: 180, req: 3,  x: 460, y: 180, effect: 'SLIDE HITBOX 20% SMALLER.' },
   { name: 'GOLDEN HEN',        cost: 320, req: 4,  x: 140, y: 225, effect: 'SHIELD RENEWS EVERY 500M.' },
   { name: 'PERFECT HUNT',      cost: 300, req: 5,  x: 300, y: 225, effect: 'NEAR-MISS PAYS 25 SCORE INSTEAD OF 10.' },
@@ -508,6 +523,14 @@ function tryUnlock(i) {
   if (!n || skillsUnlocked[i]) return;
   if (!skillReady(i)) { showToast('LOCKED - UNLOCK ' + SKILL_TREE[n.req].name + ' FIRST'); return; }
   if (playerXp < n.cost) { showToast('NEED ' + (n.cost - playerXp) + ' MORE XP'); return; }
+  // Spending XP can drop a level and cannot be undone: ask once, buy on the 2nd hit
+  if (skillsConfirm !== i) {
+    skillsConfirm = i;
+    showToast('SPEND ' + n.cost + ' XP? ACTIVATE AGAIN');
+    audio.blip();
+    return;
+  }
+  skillsConfirm = -1;
   playerXp -= n.cost;
   if (levelFromXp(playerXp) < playerLevel) playerLevel = levelFromXp(playerXp); // XP is the currency
   saveXp();
@@ -556,7 +579,7 @@ function tutorialComplete() {
   state = 'howtoplay';
   addXp(50);
   audio.fanfare();
-  showToast('TUTORIAL COMPLETE +50 EGGS +50 XP');
+  showToast('TUTORIAL COMPLETE +50 STARS +50 XP');
 }
 
 // Leave training early (P / Esc): back to the reference screen, run field cleared
@@ -614,7 +637,7 @@ function applyTheme(key) {
     .replace(/theme-[a-z0-9]+/g, '')
     .trim() + ' ' + PALETTES[key].cssClass;
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = '🎨 ' + PALETTES[key].name;
+  if (btn) btn.textContent = 'THEME ' + PALETTES[key].name;
 }
 applyTheme(currentThemeKey);
 
@@ -724,6 +747,19 @@ const HAT_ANCHORS = [
   { bob: true,  run:  { cx: 10, top: 2,  ex: 12, ey: 5 }, jump: { cx: 10, top: 2,  ex: 12, ey: 5 },
                    duck:  { cx: 17, top: 2,  ex: 16, ey: 4 }, peck: { cx: 14, top: 5,  ex: 14, ey: 7 },
                    dead:  { cx: 10, top: 2,  ex: 12, ey: 5 } }
+];
+
+// Art bounding boxes per hat for UI previews: [x0, x1, y0, y1) in art units.
+// Valid for the deterministic preview anchor: chickenIdx=0 'run' frame=1
+// => hx=0, hy=0 (bob off). Measured from the drawHat case art below.
+const HAT_BBOX = [
+  null,             // 0: NONE
+  [3, 16, -3, 5],   // 1: grad cap (tassel fringe included)
+  [6, 15, -4, 2],   // 2: crown
+  [6, 14, -1, 2],   // 3: ribbon
+  [3, 18, -5, 2],   // 4: viking (horn tips)
+  [4, 17, -6, 2],   // 5: top hat
+  [5, 16, -6, 2],   // 6: chef toque
 ];
 
 // ---------- hats renderer (pure 1-bit whole-pixel) ----------
@@ -1271,18 +1307,20 @@ function drawChicken(pal, x, yTop, mode, frame, blinkOn, chickenIdx, hatIdx) {
   drawHat(pal, hatIdx, x, yTop, mode, frame, chickenIdx);
 }
 
-// ---------- collectible egg ----------
-function drawEgg(pal, x, y, ph) {
+// ---------- collectible star (was the egg; currency renamed to STARS) ----------
+// Same 5x6 footprint as the egg so pickup hitboxes don't change.
+function drawStar(pal, x, y, ph) {
   const s = S;
   const sx = Math.round(x), sy = Math.round(y);
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
-  R(2, 0, 1, 1);
-  R(1, 1, 3, 1);
-  R(0, 2, 5, 3);
-  R(1, 5, 3, 1);
-  ctx.fillStyle = pal.bg;
-  if (ph) R(1, 2, 1, 1); else R(3, 3, 1, 1);
+  R(2, 0, 1, 1);                 // top point
+  R(1, 1, 3, 1);                 // shoulders
+  R(0, 2, 5, 1);                 // full arms
+  R(1, 3, 3, 1);                 // body
+  R(0, 4, 1, 1); R(4, 4, 1, 1);  // spread legs
+  ctx.fillStyle = pal.bg;        // twinkle: shine hops side to side
+  if (ph) R(1, 2, 1, 1); else R(3, 2, 1, 1);
 }
 
 // ---------- feather (death puff) ----------
@@ -1529,6 +1567,29 @@ function getPointerCanvasPos(e) {
 }
 
 let hoveredBtn = null;
+
+// ---------- keyboard focus for canvas menus (Tab cycles, Enter/Space activates) ----------
+// The menu buttons only exist as fillRects, so pointer mode highlights via
+// hoveredBtn; keyboard mode reuses it so every screen shows the same focus ring.
+let kbFocus = -1;             // index into activeButtons; -1 = pointer mode
+
+function kbCycle(dir) {
+  if (!activeButtons.length) return;
+  kbFocus = (kbFocus + dir + activeButtons.length) % activeButtons.length;
+  hoveredBtn = activeButtons[kbFocus].id;
+  audio.blip();
+}
+
+function kbActivate() {
+  const b = activeButtons[kbFocus];
+  if (!b) { kbFocus = -1; return false; }
+  audio.click();
+  vibrate(15);
+  pressBox = { x: b.x, y: b.y, w: b.w, h: b.h };
+  b.onClick();
+  return true;
+}
+
 function handlePointerDownButtons(pos) {
   for (const b of activeButtons) {
     if (pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
@@ -1544,12 +1605,12 @@ function handlePointerDownButtons(pos) {
 
 // Copy scorecard text to clipboard
 function copyScoreToClipboard() {
-  const text = `Chicken Runner — 1-Bit Infinite Run!\nDistance: ${pad5(Math.floor(score))}m | Cleared: ${stats.cleared} | Eggs: ${stats.eggs} | Top Speed: ${stats.top} px/s\nCan you beat my record?`;
+  const text = `Chicken Runner — 1-Bit Infinite Run!\nDistance: ${pad5(Math.floor(score))}m | Cleared: ${stats.cleared} | Stars: ${stats.eggs} | Top Speed: ${stats.top} px/s\nCan you beat my record?`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       showToast('SCORE COPIED TO CLIPBOARD!');
     }).catch(() => {
-      showToast('DIST ' + pad5(Math.floor(score)) + ' COPIED!');
+      showToast('CLIPBOARD BLOCKED - SCORE SAVED!');
     });
   } else {
     showToast('DIST ' + pad5(Math.floor(score)) + ' RECORDED!');
@@ -1579,18 +1640,32 @@ function inSpeaker(cx, cy) {
 }
 
 window.addEventListener('keydown', e => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyP', 'KeyM', 'KeyT', 'KeyB', 'KeyF', 'KeyC', 'Enter'].indexOf(e.code) >= 0) e.preventDefault();
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyP', 'KeyR', 'KeyM', 'KeyT', 'KeyB', 'KeyF', 'KeyC', 'Enter'].indexOf(e.code) >= 0) e.preventDefault();
   if (e.repeat) return;
+
+  // Keyboard focus on canvas buttons — menus only (gameplay keys stay untouched)
+  if (state !== 'playing' && activeButtons.length) {
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      kbCycle(e.shiftKey ? -1 : 1);
+      return;
+    }
+    if (kbFocus >= 0 && (e.code === 'Enter' || e.code === 'Space')) {
+      if (kbActivate()) return;   // stale index: fall through to the default action
+    }
+  }
 
   // Skills tree: arrows cycle nodes, Enter buys, Esc goes back
   if (state === 'skills') {
     if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA' || e.code === 'KeyW') {
       skillsSel = (skillsSel + SKILL_TREE.length - 1) % SKILL_TREE.length;
+      skillsConfirm = -1;
       audio.blip();
       return;
     }
     if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD' || e.code === 'KeyS') {
       skillsSel = (skillsSel + 1) % SKILL_TREE.length;
+      skillsConfirm = -1;
       audio.blip();
       return;
     }
@@ -1637,6 +1712,9 @@ window.addEventListener('keydown', e => {
     audio.click();
   } else if (e.code === 'KeyF') {
     toggleFullscreen();
+  } else if (e.code === 'KeyR') {
+    // RESTART [R] — only meaningful while the run is paused (label on the pause menu)
+    if (state === 'paused') { resetRun(); audio.blip(); return; }
   } else if (e.code === 'KeyP') {
     if (tutorial) { exitTutorial(); audio.blip(); return; }
     if (state === 'playing') state = 'paused';
@@ -1658,7 +1736,12 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => {
   if (e.code === 'ArrowDown' || e.code === 'KeyS') duckHeld = false;
 });
-window.addEventListener('blur', () => { duckHeld = false; });
+// Losing focus mid-run used to leave the world scrolling: auto-pause instead
+function autoPause() {
+  if (state === 'playing') { state = 'paused'; duckHeld = false; pressBox = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
+window.addEventListener('blur', () => { duckHeld = false; autoPause(); });
 
 // Canvas Pointer Events
 cv.addEventListener('pointerdown', e => {
@@ -1688,6 +1771,7 @@ window.addEventListener('pointerup', () => {
 
 cv.addEventListener('pointermove', e => {
   const pos = getPointerCanvasPos(e);
+  kbFocus = -1;                     // mouse back in charge: drop keyboard focus
   let nowHover = null;
   for (const b of activeButtons) {
     if (pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
@@ -1731,6 +1815,33 @@ if (domBezelBtn) domBezelBtn.addEventListener('click', () => {
 });
 const domFsBtn = document.getElementById('btn-fullscreen');
 if (domFsBtn) domFsBtn.addEventListener('click', () => toggleFullscreen());
+
+// Wipe saved data (localStorage) — 2-step confirm, same pattern as skill unlocks:
+// losing XP/top-5/hats to a stray click is unrecoverable.
+let clearArmed = false, clearTimer = 0;
+const domClearBtn = document.getElementById('btn-clear');
+if (domClearBtn) domClearBtn.addEventListener('click', () => {
+  if (!clearArmed) {
+    clearArmed = true;
+    domClearBtn.textContent = 'CONFIRM?';
+    showToast('CLEAR ALL SAVED DATA? CLICK AGAIN');
+    audio.blip();
+    clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => { clearArmed = false; domClearBtn.textContent = 'CLEAR'; }, 4000);
+    return;
+  }
+  clearTimeout(clearTimer);
+  clearArmed = false;
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('piRunner') === 0) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  location.reload();
+});
 
 // Hook Virtual Touch Buttons
 const domTouchSlide = document.getElementById('btn-touch-slide');
@@ -2256,12 +2367,12 @@ function drawHUD(pal, t) {
     drawText('HI ' + pad5(hi) + ' ' + liveScore, W - 20, 14, 2, pal.fg, opts);
   }
 
-  // Top-Left: Speaker icon + Live Egg Counter (bounces on pickup)
+  // Top-Left: Speaker icon + Live Star Counter (bounces on pickup)
   const eggBob = eggPulse > 0
     ? -Math.round(Math.sin((0.28 - eggPulse) / 0.28 * Math.PI) * 3)
     : 0;
   drawSpeaker(pal, audio.mode);
-  drawEgg(pal, 58, 14 + eggBob, Math.floor(t * 4) % 2);
+  drawStar(pal, 58, 14 + eggBob, Math.floor(t * 4) % 2);
   drawText('x ' + pad5(state === 'playing' ? stats.eggs : bankEggs), 82, 16 + eggBob, 2, pal.fg, { gap: 2, outline: pal.bg });
 
   // Combo meter under the egg counter — fills with the streak, blinks near expiry (Fase C)
@@ -2286,10 +2397,10 @@ function drawHUD(pal, t) {
     ctx.fillStyle = pal.fg; box(tx, ty0, tw0, th0);
     ctx.fillStyle = pal.bg; box(tx + 2, ty0 + 2, tw0 - 4, th0 - 4);
     drawText('TRAINING - STEP ' + Math.min(tutStep + 1, 3) + ' OF 3', tx + 10, ty0 + 8, 1, pal.fg, { gap: 2, outline: pal.bg });
-    const tutRows = ['JUMP THE SPIKE [SPACE]', 'SLIDE THE FALCON [DOWN]', 'GRAB THE EGG'];
+    const tutRows = ['JUMP THE SPIKE', 'SLIDE THE FALCON', 'GRAB THE STAR'];
     tutRows.forEach((r, i) => {
       const mark = i < tutStep ? '★ ' : (i === tutStep ? '> ' : '□ ');
-      drawText(mark + r, tx + 10, ty0 + 30 + i * 18, 1, pal.fg, { gap: 2, outline: pal.bg });
+      drawText(mark + r, tx + 10, ty0 + 30 + i * 18, 2, pal.fg, { gap: 2, outline: pal.bg });
     });
   }
 
@@ -2308,6 +2419,10 @@ function drawHUD(pal, t) {
     } else {
       drawText(meterStr, W / 2, 14, 2, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
     }
+    // ESCAPE REFLEX slow-down was silent before: label it under the gauge
+    if (slowT > 0) {
+      drawText('SLOW -10%', W / 2, 31, 1, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
+    }
   }
 
   // Flying Danger Telegraph on Right Edge (falcon / owl)
@@ -2320,7 +2435,7 @@ function drawHUD(pal, t) {
           ctx.fillStyle = pal.bg;
           box(W - 128, GROUND - 66, 116, 16);
           const warn = o.type === 'falcon' ? 'FALCON' : 'OWL';
-          drawText('▲ DUCK ' + warn + ' ▲', W - 70, GROUND - 63, 1, pal.fg, { align: 'center', gap: 2 });
+          drawText('▼ SLIDE ' + warn + ' ▼', W - 70, GROUND - 63, 1, pal.fg, { align: 'center', gap: 2 });
         }
       }
     }
@@ -2385,7 +2500,11 @@ function drawScreens(pal, t) {
   clearButtons();
 
   // Screen-entry clock: every screen bounces in, staggered (Fase 2)
-  if (state !== lastScreenState) { lastScreenState = state; stateEnterTime = time; }
+  if (state !== lastScreenState) {
+    lastScreenState = state; stateEnterTime = time;
+    // New screen = new button list: drop stale keyboard focus / hover / confirm
+    kbFocus = -1; hoveredBtn = null; skillsConfirm = -1;
+  }
   const st = time - stateEnterTime;
 
   if (state === 'menu') {
@@ -2425,14 +2544,20 @@ function drawScreens(pal, t) {
       drawPixelButton(pal, bx, by, btnW, btnH, item.label, hoveredBtn === item.id);
     });
 
-    if (blinkNow(t, 1.3, 0.85)) {
+    // WCAG 2.2.2: the hint may blink on entry but must not blink forever —
+    // after 6s it settles solid. y=269: below the menu panel (ends ~268),
+    // above the XP bar (H-4 = 276); glyph height at scale 1 is 7px.
+    if (st > 6 || blinkNow(t, 1.3, 0.85)) {
       const seasonsList = ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER'];
       drawText('WORLD // ' + seasonsList[season] + ' - SPACE TO RUN - C FOR CHICKENS',
-        W / 2, 267, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+        W / 2, 269, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
     }
   } else if (state === 'chickens') {
     drawText('// CHOOSE YOUR CHICKEN //', W / 2, 24 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
     drawText('ROOSTER ROSTER [' + (rosterSelect + 1) + ' / ' + CHICKENS.length + ']', W / 2, 48, 2, pal.fg, { align: 'center', outline: pal.bg });
+    // GP13 expectation management: all 5 runners are stat-identical (cosmetic only)
+    // y=269: below BACK (ends 268), above the XP bar (H-4 = 276)
+    drawText('ALL RUNNERS PLAY THE SAME - LOOKS ONLY', W / 2, 269, 1, pal.fg, { align: 'center', gap: 2, outline: pal.bg });
 
     const c = CHICKENS[rosterSelect];
     const isCurrent = activeChicken === rosterSelect;
@@ -2451,23 +2576,25 @@ function drawScreens(pal, t) {
 
     // Info panel on right side of stage
     drawText(c.name, sbX + 144, sbY + 16, 3, pal.fg, { outline: pal.bg });
-    drawText('★ ' + c.title + ' ★', sbX + 144, sbY + 44, 1, pal.fg);
-    drawText(c.desc, sbX + 144, sbY + 64, 1, pal.fg, { gap: 1 });
+    drawText('★ ' + c.title + ' ★', sbX + 144, sbY + 44, 2, pal.fg, { outline: pal.bg });
+    // Long flavor lines (e.g. CHUBBY CHICK) used to overflow the stage frame
+    wrapText(c.desc, sbW - 150, 1, 1).slice(0, 2).forEach((ln, li) =>
+      drawText(ln, sbX + 144, sbY + 66 + li * 11, 1, pal.fg, { gap: 1, outline: pal.bg }));
 
     if (isCurrent) {
       drawText('ACTIVE RUNNER [SELECTED]', sbX + 144, sbY + 92, 2, pal.fg, { outline: pal.bg });
     }
 
     // Prev / Next Navigation Buttons
-    addButton('btn_c_prev', W / 2 - 270, 110, 50, 42, () => {
+    addButton('btn_c_prev', W / 2 - 300, 110, 50, 42, () => {
       rosterSelect = (rosterSelect - 1 + CHICKENS.length) % CHICKENS.length;
     }, '<');
-    drawPixelButton(pal, W / 2 - 270, 110, 50, 42, '<', hoveredBtn === 'btn_c_prev');
+    drawPixelButton(pal, W / 2 - 300, 110, 50, 42, '<', hoveredBtn === 'btn_c_prev');
 
-    addButton('btn_c_next', W / 2 + 220, 110, 50, 42, () => {
+    addButton('btn_c_next', W / 2 + 250, 110, 50, 42, () => {
       rosterSelect = (rosterSelect + 1) % CHICKENS.length;
     }, '>');
-    drawPixelButton(pal, W / 2 + 220, 110, 50, 42, '>', hoveredBtn === 'btn_c_next');
+    drawPixelButton(pal, W / 2 + 250, 110, 50, 42, '>', hoveredBtn === 'btn_c_next');
 
     // Action button: SELECT & RUN
     const actLabel = isCurrent ? 'RUN WITH ' + c.name : 'SELECT & RUN';
@@ -2492,20 +2619,18 @@ function drawScreens(pal, t) {
     if (tutDone) {
       drawText('★ TRAINING COMPLETE - REWARD CLAIMED ★', W / 2, 56 + howEnter, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
     } else {
-      drawText('TRAINING REWARD: +50 EGGS +50 XP', W / 2, 56 + howEnter, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
+      drawText('TRAINING REWARD: +50 STARS +50 XP', W / 2, 56 + howEnter, 1, pal.fg, { gap: 2, align: 'center', outline: pal.bg });
     }
 
-    // Section 1: Jump
-    drawText('▲ JUMP [SPACE / UP / RIGHT TAP]', 90, 80, 2, pal.fg, { outline: pal.bg });
-    drawText('CLEAR SPIKES, FENCES, FOXES & HAY', 90, 102, 1, pal.fg, { outline: pal.bg });
+    // Obstacle -> action summary: heading = control, line = what it beats
+    drawText('▲ JUMP [SPACE / UP / RIGHT TAP]', 90, 78, 2, pal.fg, { outline: pal.bg });
+    drawText('SPIKES - FENCES - FOXES - HAY - CRATES', 90, 98, 2, pal.fg, { outline: pal.bg });
 
-    // Section 2: Slide
-    drawText('▼ SLIDE [DOWN / S / LEFT TAP]', 90, 134, 2, pal.fg, { outline: pal.bg });
-    drawText('DUCK UNDER FALCONS, OWLS & FAST-FALL', 90, 156, 1, pal.fg, { outline: pal.bg });
+    drawText('▼ SLIDE [DOWN / S / LEFT TAP]', 90, 130, 2, pal.fg, { outline: pal.bg });
+    drawText('FALCONS - OWLS - FAST-FALLS IN AIR', 90, 150, 2, pal.fg, { outline: pal.bg });
 
-    // Section 3: Eggs & Near Miss
-    drawText('🥚 COLLECT EGGS & NEAR-MISS', 90, 188, 2, pal.fg, { outline: pal.bg });
-    drawText('CHAIN EGGS FOR STREAKS & BUY HATS IN SHOP', 90, 210, 1, pal.fg, { outline: pal.bg });
+    drawText('★ COLLECT STARS - NEAR-MISS = +10', 90, 182, 2, pal.fg, { outline: pal.bg });
+    drawText('CHAIN STARS FOR COMBO - SHOP HATS', 90, 202, 2, pal.fg, { outline: pal.bg });
 
     // Practice (interactive tutorial) + Back
     const howBtnY = 240;
@@ -2522,7 +2647,7 @@ function drawScreens(pal, t) {
     const isUnlocked = unlockedHats[shopSelect];
     const isEquipped = activeHat === shopSelect;
 
-    drawText('BANK: ' + pad5(bankEggs) + ' EGGS', W / 2, 56, 2, pal.fg, { align: 'center', outline: pal.bg });
+    drawText('BANK: ' + pad5(bankEggs) + ' STARS', W / 2, 56, 2, pal.fg, { align: 'center', outline: pal.bg });
 
     // --- Preview stage: chicken wearing the hat, with headroom for tall hats ---
     const sbX = 234, sbY = 74, sbW = 260, sbH = 116;
@@ -2552,18 +2677,26 @@ function drawScreens(pal, t) {
       drawText('CLASSIC BAREHEAD', fx + fw / 2, fy + 52, 1, pal.fg, { align: 'center', outline: pal.bg });
     } else {
       // Integer-scale zoom (2x) keeps the pixels crisp — grayCount stays 0.
-      // y+42: tallest hats (TOP HAT/CHEF) clear the frame by 3px; the name below
-      // sits at y+73 so the GRAD CAP tassel keeps 2px of air before the text.
+      // Center the art by its own bbox (HAT_BBOX): the old fixed (-42, +42)
+      // offset landed the cap ~21px right of the card center and drifted with
+      // the active chicken's head anchor + run bob. frame=1 & chickenIdx=0
+      // make the anchor deterministic (hx=0, hy=0) and bob-free.
+      const bb = HAT_BBOX[shopSelect];
+      const K = S * 2;                                // 6px per art px at 2x
+      const areaTop = fy + 3, areaBot = fy + 73;      // inner frame top .. name row
+      const artH = (bb[3] - bb[2]) * K;
       ctx.save();
-      ctx.translate(fx + fw / 2 - 42, fy + 42);
+      ctx.translate(
+        Math.round(fx + fw / 2 - (bb[0] + bb[1]) / 2 * K),
+        Math.round(areaTop + (areaBot - areaTop - artH) / 2 - bb[2] * K));
       ctx.scale(2, 2);
-      drawHat(pal, shopSelect, 0, 0, 'run', 0, activeChicken);
+      drawHat(pal, shopSelect, 0, 0, 'run', 1, 0);
       ctx.restore();
     }
 
     drawText(hat.name, fx + fw / 2, fy + 73, 2, pal.fg, { align: 'center', outline: pal.bg });
     drawText(hat.desc, fx + fw / 2, fy + 89, 1, pal.fg, { align: 'center', outline: pal.bg });
-    drawText(isEquipped ? 'EQUIPPED - LOOKING GOOD' : isUnlocked ? 'OWNED - READY TO EQUIP' : 'LOCKED - COST ' + hat.cost + ' EGGS',
+    drawText(isEquipped ? 'EQUIPPED - LOOKING GOOD' : isUnlocked ? 'OWNED - READY TO EQUIP' : 'LOCKED - COST ' + hat.cost + ' STARS',
       fx + fw / 2, fy + 103, 1, pal.fg, { align: 'center', outline: pal.bg });
 
     // Prev / Next Buttons (outside both frames)
@@ -2578,7 +2711,7 @@ function drawScreens(pal, t) {
     drawPixelButton(pal, fx + fw + 10, sbY + 40, 50, 36, '>', hoveredBtn === 'btn_next');
 
     // Purchase / Equip Button
-    let actionLabel = isEquipped ? 'EQUIPPED' : isUnlocked ? 'EQUIP' : 'BUY (' + hat.cost + ' EGGS)';
+    let actionLabel = isEquipped ? 'EQUIPPED' : isUnlocked ? 'EQUIP' : 'BUY (' + hat.cost + ' STARS)';
     addButton('btn_buy_equip', W / 2 - 100, 204, 200, 30, () => {
       if (isEquipped) return;
       if (isUnlocked) {
@@ -2594,7 +2727,7 @@ function drawScreens(pal, t) {
         showToast('PURCHASED: ' + hat.name);
       } else {
         audio.blip();
-        showToast('NOT ENOUGH EGGS!');
+        showToast('NOT ENOUGH STARS!');
       }
     }, actionLabel);
     drawPixelButton(pal, W / 2 - 100, 204, 200, 30, actionLabel, hoveredBtn === 'btn_buy_equip');
@@ -2605,16 +2738,25 @@ function drawScreens(pal, t) {
   } else if (state === 'records') {
     drawText('// HALL OF FAME //', W / 2, 30 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
 
+    // Fixed pixel columns: the old space-padded strings left DATE one cell off
     const rx = W / 2 - 200, ry = 66;
-    drawText('RANK   DISTANCE   EGGS   DATE', rx, ry, 2, pal.fg, { gap: 2, outline: pal.bg });
+    const colRank = rx, colDist = rx + 160, colEggs = rx + 270, colDate = rx + 310;
+    const hOpts = { gap: 2, outline: pal.bg };
+    drawText('RANK', colRank, ry, 2, pal.fg, hOpts);
+    drawText('DISTANCE', colDist, ry, 2, pal.fg, { gap: 2, align: 'right', outline: pal.bg });
+    drawText('STARS', colEggs, ry, 2, pal.fg, { gap: 2, align: 'right', outline: pal.bg });
+    drawText('DATE', colDate, ry, 2, pal.fg, hOpts);
     box(rx, ry + 18, 400, 2);
 
     if (top5.length === 0) {
       drawText('NO RUNS LOGGED YET!', W / 2, ry + 40, 2, pal.fg, { align: 'center', outline: pal.bg });
     } else {
       top5.forEach((r, idx) => {
-        const rowStr = '#' + (idx + 1) + '     ' + pad5(r.score) + 'M     ' + pad5(r.eggs) + '   ' + (r.date || '--/--');
-        drawText(rowStr, rx, ry + 28 + idx * 24, 2, pal.fg, { gap: 2, outline: pal.bg });
+        const rowY = ry + 28 + idx * 24;
+        drawText('#' + (idx + 1), colRank, rowY, 2, pal.fg, hOpts);
+        drawText(pad5(r.score) + 'M', colDist, rowY, 2, pal.fg, { gap: 2, align: 'right', outline: pal.bg });
+        drawText(pad5(r.eggs), colEggs, rowY, 2, pal.fg, { gap: 2, align: 'right', outline: pal.bg });
+        drawText(r.date || '--/--', colDate, rowY, 2, pal.fg, hOpts);
       });
     }
 
@@ -2623,22 +2765,22 @@ function drawScreens(pal, t) {
   } else if (state === 'badges') {
     drawText('// RETRO ACHIEVEMENTS //', W / 2, 28 + enterOffset(0, 0.32, st), 3, pal.fg, { align: 'center', outline: pal.bg });
 
-    const colW = 380, startY = 64;
+    const colW = 380, startY = 64, boxH = 48, rowStep = 56;
     BADGES.forEach((b, idx) => {
       const col = idx % 2;
       const row = Math.floor(idx / 2);
       const bx = W / 2 - 390 + col * 400;
-      const by = startY + row * 46;
+      const by = startY + row * rowStep;
       const isUn = unlockedBadges[idx];
 
       ctx.fillStyle = pal.fg;
-      box(bx, by, colW, 40);
+      box(bx, by, colW, boxH);
       ctx.fillStyle = pal.bg;
-      box(bx + 2, by + 2, colW - 4, 36);
+      box(bx + 2, by + 2, colW - 4, boxH - 4);
 
       const mark = isUn ? '★' : '□';
-      drawText(mark + ' ' + b.title, bx + 10, by + 8, 2, pal.fg);
-      drawText(b.desc, bx + 10, by + 24, 1, pal.fg);
+      drawText(mark + ' ' + b.title, bx + 10, by + 7, 2, pal.fg);
+      drawText(b.desc, bx + 10, by + 27, 2, pal.fg);
     });
 
     addButton('btn_badg_back', W / 2 - 70, 236, 140, 28, () => { state = 'menu'; }, 'BACK');
@@ -2704,27 +2846,22 @@ function drawScreens(pal, t) {
     ctx.fillStyle = pal.fg; box(cx0, cy0, cw, ch);
     ctx.fillStyle = pal.bg; box(cx0 + 3, cy0 + 3, cw - 6, ch - 6);
 
-    drawText(n.name, cx0 + cw / 2, cy0 + 12, 2, pal.fg, { align: 'center', outline: pal.bg });
-    drawText(un ? 'STATUS: UNLOCKED' : ready ? 'STATUS: READY TO BUY' : 'STATUS: LOCKED',
-      cx0 + cw / 2, cy0 + 38, 1, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(n.name, cx0 + cw / 2, cy0 + 10, 2, pal.fg, { align: 'center', outline: pal.bg });
+    drawText(un ? 'STATUS: UNLOCKED' : ready ? 'STATUS: READY TO UNLOCK' : 'STATUS: LOCKED',
+      cx0 + cw / 2, cy0 + 32, 2, pal.fg, { align: 'center', outline: pal.bg });
     drawText('COST ' + n.cost + ' XP - YOUR XP ' + playerXp,
-      cx0 + cw / 2, cy0 + 54, 1, pal.fg, { align: 'center', outline: pal.bg });
+      cx0 + cw / 2, cy0 + 50, 2, pal.fg, { align: 'center', outline: pal.bg });
     drawText(n.req >= 0 ? 'REQUIRES ' + SKILL_TREE[n.req].name : 'ENTRY POINT - NO PREREQ',
-      cx0 + cw / 2, cy0 + 68, 1, pal.fg, { align: 'center', outline: pal.bg });
+      cx0 + cw / 2, cy0 + 68, 2, pal.fg, { align: 'center', outline: pal.bg });
 
-    // Effect text, hand-wrapped (scale 1, pitch ~6px, ~46 chars per line)
-    const words = n.effect.split(' ');
-    const lines = []; let cur = '';
-    for (const w of words) {
-      if ((cur + ' ' + w).trim().length > 46) { lines.push(cur.trim()); cur = w; }
-      else cur += ' ' + w;
-    }
-    if (cur.trim()) lines.push(cur.trim());
-    lines.forEach((ln, li) => {
-      drawText(ln, cx0 + cw / 2, cy0 + 88 + li * 14, 1, pal.fg, { align: 'center', outline: pal.bg });
+    // Effect text, word-wrapped at scale 2 (~27 chars per line, max 3 lines)
+    wrapText(n.effect, cw - 12, 2, 2).slice(0, 3).forEach((ln, li) => {
+      drawText(ln, cx0 + cw / 2, cy0 + 90 + li * 16, 2, pal.fg, { align: 'center', outline: pal.bg });
     });
 
-    const btnLabel = un ? '★ UNLOCKED ★' : 'UNLOCK - ' + n.cost + ' XP';
+    const btnLabel = un ? '★ UNLOCKED ★'
+      : skillsConfirm === showIdx ? 'CONFIRM - ' + n.cost + ' XP'
+      : 'UNLOCK - ' + n.cost + ' XP';
     addButton('btn_sk_unlock', cx0 + 60, cy0 + 140, 230, 26, () => tryUnlock(showIdx), btnLabel);
     drawPixelButton(pal, cx0 + 60, cy0 + 140, 230, 26, btnLabel, hoveredBtn === 'btn_sk_unlock');
 
@@ -2790,9 +2927,9 @@ function drawScreens(pal, t) {
     const statRows = [
       ['DISTANCE REACHED', pad5(Math.floor(score)) + ' M'],
       ['OBSTACLES CLEARED', pad5(stats.cleared)],
-      ['EGGS COLLECTED', pad5(stats.eggs)],
+      ['STARS COLLECTED', pad5(stats.eggs)],
       ['TOP VELOCITY', stats.top + ' PX/S'],
-      ['TOTAL BANK EGGS', pad5(bankEggs)],
+      ['TOTAL BANK STARS', pad5(bankEggs)],
       ['XP EARNED', '+' + (playerXp - xpRunStart)],
       ['LEVEL', levelRunStart + ' > ' + playerLevel]
     ];
@@ -2815,17 +2952,18 @@ function drawScreens(pal, t) {
     // Action Buttons — drop in last, once the receipt has finished printing
     if (rst > 0.7) {
       const bdy = enterOffset(0.7, 0.3, rst);
-      addButton('btn_again', rx + 24, ry + 148 + bdy, 120, 28, () => resetRun(), 'PLAY AGAIN');
-      drawPixelButton(pal, rx + 24, ry + 148 + bdy, 120, 28, 'AGAIN', hoveredBtn === 'btn_again');
+      addButton('btn_again', rx + 24, ry + 148 + bdy, 126, 28, () => resetRun(), 'PLAY AGAIN');
+      drawPixelButton(pal, rx + 24, ry + 148 + bdy, 126, 28, 'PLAY AGAIN', hoveredBtn === 'btn_again');
 
-      addButton('btn_share', rx + 158, ry + 148 + bdy, 130, 28, () => copyScoreToClipboard(), 'COPY SCORE');
-      drawPixelButton(pal, rx + 158, ry + 148 + bdy, 130, 28, 'COPY SCORE', hoveredBtn === 'btn_share');
+      addButton('btn_share', rx + 164, ry + 148 + bdy, 130, 28, () => copyScoreToClipboard(), 'COPY SCORE');
+      drawPixelButton(pal, rx + 164, ry + 148 + bdy, 130, 28, 'COPY SCORE', hoveredBtn === 'btn_share');
 
       addButton('btn_d_menu', rx + 302, ry + 148 + bdy, 114, 28, () => { state = 'menu'; }, 'MENU');
       drawPixelButton(pal, rx + 302, ry + 148 + bdy, 114, 28, 'MENU', hoveredBtn === 'btn_d_menu');
     }
 
-    if (deathT > 1.3 && blinkNow(t, 1.3, 0.85)) {
+    // Same WCAG 2.2.2 rule as the menu hint: blink on entry, settle solid
+    if (deathT > 1.3 && (deathT > 8 || blinkNow(t, 1.3, 0.85))) {
       drawText('[SPACE / TAP TO REPLAY]', W / 2, 236, 2, pal.fg, { align: 'center', outline: pal.bg });
     }
   }
@@ -2865,6 +3003,9 @@ function drawPlayer(pal, t) {
     }
     return;
   }
+  // ARMOR FEATHERS / ESCAPE REFLEX: flicker while invincible so the block reads
+  if (invT > 0 && Math.floor(t * 12) % 2 === 0) return;
+
   const bl = blinkT < 0 && state !== 'paused';
   if (player.ducking && player.onGround) drawChicken(pal, bx, player.y + SLIDE_OFF, 'duck', 0, false);
   else if (!player.onGround) drawChicken(pal, bx, player.y, 'jump', player.frame, false);
@@ -2888,7 +3029,7 @@ function render() {
   drawSeasonFx(pal, t, season);
 
   ctx.fillStyle = pal.fg;
-  for (const p of picks) drawEgg(pal, p.x, p.y, p.ph);
+  for (const p of picks) drawStar(pal, p.x, p.y, p.ph);
   for (const o of obstacles) drawObstacle(pal, t, o);
 
   drawShadow(pal);

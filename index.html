@@ -41,7 +41,7 @@
         <input type="range" id="gameSizeSlider" min="0.5" max="3" step="0.05" style="width:100%;"/>
         <input type="number" id="gameSizeNumber" min="0.5" max="3" step="0.05" style="width:100%;margin-top:4px;"/>
       </div>
-      <button id="saveStarSizeBtn" style="width:100%;padding:4px;background:#555;color:#fff;border:none;cursor:pointer;">Save</button>
+      <button id="saveStarSizeBtn" style="width:100%;padding:6px;background:#555;color:#fff;border:none;cursor:pointer;">Save (persist)</button>
     </div>
 
     <div id="toast" class="toast-hidden"></div>
@@ -93,13 +93,22 @@
         gameSlider.value = game; gameNumber.value = game;
       };
 
+      const applyLive = () => {
+        window.starSizeHUD = parseFloat(hudSlider.value) || 1;
+        window.starSizeGame = parseFloat(gameSlider.value) || 1;
+      };
+
       const sync = (slider, number) => {
-        slider.addEventListener('input', () => { number.value = slider.value; });
-        number.addEventListener('change', () => {
+        slider.addEventListener('input', () => {
+          number.value = slider.value;
+          applyLive();
+        });
+        number.addEventListener('input', () => {
           let v = parseFloat(number.value);
           if (isNaN(v) || v < 0.5) v = 0.5;
           if (v > 3) v = 3;
           slider.value = v; number.value = v;
+          applyLive();
         });
       };
 
@@ -109,10 +118,11 @@
       saveBtn.addEventListener('click', () => {
         localStorage.setItem('starSizeHUD', hudSlider.value);
         localStorage.setItem('starSizeGame', gameSlider.value);
-        location.reload();
+        applyLive();
       });
 
       loadValues();
+      applyLive();
     });
     </script>
 </body>

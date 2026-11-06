@@ -1313,8 +1313,11 @@ function drawChicken(pal, x, yTop, mode, frame, blinkOn, chickenIdx, hatIdx) {
 
 // ---------- collectible star (1-bit retro arcade star) ----------
 function drawStar(pal, x, y, ph) {
-  const s = S * (window._starScaleCurrent || 1);
-  const sx = Math.round(x), sy = Math.round(y);
+  const scale = window._starScaleCurrent || 1;
+  const s = S * scale;
+  // Star bounding box is 7x6 sprite-pixels. Centre offset so it grows from centre.
+  const cx = 3.5 * S, cy = 3 * S; // centre at base scale
+  const sx = Math.round(x + cx - 3.5 * s), sy = Math.round(y + cy - 3 * s);
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
   R(3, 0, 1, 1);                 // top point

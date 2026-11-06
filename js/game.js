@@ -9,8 +9,8 @@
 const W = 960, H = 280, GROUND = 225;
 const S = 3;                                      // sprite scale: 1 sprite px = 3 canvas px
 // Star scaling factors (loaded from localStorage). These affect only the star sprite.
-window.starSizeHUD = parseFloat(localStorage.getItem('starSizeHUD')) || 1;
-window.starSizeGame = parseFloat(localStorage.getItem('starSizeGame')) || 1;
+window.starSizeHUD = parseFloat(localStorage.getItem('starSizeHUD')) || 0.85;
+window.starSizeGame = parseFloat(localStorage.getItem('starSizeGame')) || 0.85;
 window._starScaleCurrent = 1; // temporary multiplier set before each drawStar call
 const STAND_W = 16 * S, STAND_H = 22 * S;        // chicken: 48 x 66
 const SLIDE_W = 22 * S, SLIDE_H = 12 * S;        // chicken duck: 66 x 36

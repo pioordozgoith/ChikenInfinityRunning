@@ -29,7 +29,8 @@
     <div id="screen-glare"></div>
     <canvas id="game" width="960" height="280"></canvas>
     <!-- Star Size Adjustment Panel -->
-    <div id="starSizePanel" style="position:fixed;right:0;top:0;width:220px;height:100%;background:#222;color:#eee;padding:12px;overflow:auto;box-sizing:border-box;">
+    <button id="toggleStarPanel" style="position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:1001;background:#333;color:#eee;border:none;padding:6px 4px;cursor:pointer;writing-mode:vertical-lr;font-size:11px;border-radius:4px 0 0 4px;">⚙ Stars</button>
+    <div id="starSizePanel" style="position:fixed;right:0;top:0;width:220px;height:100%;background:#222;color:#eee;padding:12px;overflow:auto;box-sizing:border-box;z-index:1000;transition:transform .2s ease;">
       <h3 style="margin-top:0;">Star Size Settings</h3>
       <div style="margin-bottom:12px;">
         <label for="hudSizeSlider">HUD Star Size</label><br/>
@@ -87,8 +88,8 @@
       const saveBtn = document.getElementById('saveStarSizeBtn');
 
       const loadValues = () => {
-        const hud = parseFloat(localStorage.getItem('starSizeHUD')) || 1;
-        const game = parseFloat(localStorage.getItem('starSizeGame')) || 1;
+        const hud = parseFloat(localStorage.getItem('starSizeHUD')) || 0.85;
+        const game = parseFloat(localStorage.getItem('starSizeGame')) || 0.85;
         hudSlider.value = hud; hudNumber.value = hud;
         gameSlider.value = game; gameNumber.value = game;
       };
@@ -123,6 +124,25 @@
 
       loadValues();
       applyLive();
+
+      // Toggle panel visibility
+      const panel = document.getElementById('starSizePanel');
+      const toggleBtn = document.getElementById('toggleStarPanel');
+      const hidden = localStorage.getItem('starPanelHidden') === '1';
+      if (hidden) { panel.style.transform = 'translateX(100%)'; toggleBtn.style.right = '0'; }
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = panel.style.transform === 'translateX(100%)';
+        if (isHidden) {
+          panel.style.transform = 'translateX(0)';
+          toggleBtn.style.right = '220px';
+          localStorage.setItem('starPanelHidden', '0');
+        } else {
+          panel.style.transform = 'translateX(100%)';
+          toggleBtn.style.right = '0';
+          localStorage.setItem('starPanelHidden', '1');
+        }
+      });
+      if (!hidden) toggleBtn.style.right = '220px';
     });
     </script>
 </body>

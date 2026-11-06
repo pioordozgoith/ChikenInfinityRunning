@@ -28,6 +28,22 @@
   <div id="screen-enclosure">
     <div id="screen-glare"></div>
     <canvas id="game" width="960" height="280"></canvas>
+    <!-- Star Size Adjustment Panel -->
+    <div id="starSizePanel" style="position:fixed;right:0;top:0;width:220px;height:100%;background:#222;color:#eee;padding:12px;overflow:auto;box-sizing:border-box;">
+      <h3 style="margin-top:0;">Star Size Settings</h3>
+      <div style="margin-bottom:12px;">
+        <label for="hudSizeSlider">HUD Star Size</label><br/>
+        <input type="range" id="hudSizeSlider" min="0.5" max="3" step="0.05" style="width:100%;"/>
+        <input type="number" id="hudSizeNumber" min="0.5" max="3" step="0.05" style="width:100%;margin-top:4px;"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label for="gameSizeSlider">Game Star Size</label><br/>
+        <input type="range" id="gameSizeSlider" min="0.5" max="3" step="0.05" style="width:100%;"/>
+        <input type="number" id="gameSizeNumber" min="0.5" max="3" step="0.05" style="width:100%;margin-top:4px;"/>
+      </div>
+      <button id="saveStarSizeBtn" style="width:100%;padding:4px;background:#555;color:#fff;border:none;cursor:pointer;">Save</button>
+    </div>
+
     <div id="toast" class="toast-hidden"></div>
   </div>
 
@@ -62,5 +78,42 @@
 </footer>
 
 <script src="js/game.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const hudSlider = document.getElementById('hudSizeSlider');
+      const hudNumber = document.getElementById('hudSizeNumber');
+      const gameSlider = document.getElementById('gameSizeSlider');
+      const gameNumber = document.getElementById('gameSizeNumber');
+      const saveBtn = document.getElementById('saveStarSizeBtn');
+
+      const loadValues = () => {
+        const hud = parseFloat(localStorage.getItem('starSizeHUD')) || 1;
+        const game = parseFloat(localStorage.getItem('starSizeGame')) || 1;
+        hudSlider.value = hud; hudNumber.value = hud;
+        gameSlider.value = game; gameNumber.value = game;
+      };
+
+      const sync = (slider, number) => {
+        slider.addEventListener('input', () => { number.value = slider.value; });
+        number.addEventListener('change', () => {
+          let v = parseFloat(number.value);
+          if (isNaN(v) || v < 0.5) v = 0.5;
+          if (v > 3) v = 3;
+          slider.value = v; number.value = v;
+        });
+      };
+
+      sync(hudSlider, hudNumber);
+      sync(gameSlider, gameNumber);
+
+      saveBtn.addEventListener('click', () => {
+        localStorage.setItem('starSizeHUD', hudSlider.value);
+        localStorage.setItem('starSizeGame', gameSlider.value);
+        location.reload();
+      });
+
+      loadValues();
+    });
+    </script>
 </body>
 </html>

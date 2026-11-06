@@ -1314,7 +1314,6 @@ function drawChicken(pal, x, yTop, mode, frame, blinkOn, chickenIdx, hatIdx) {
 // ---------- collectible star (1-bit retro arcade star) ----------
 function drawStar(pal, x, y, ph) {
   const s = S * (window._starScaleCurrent || 1);
-  const s = S;
   const sx = Math.round(x), sy = Math.round(y);
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
@@ -2375,7 +2374,12 @@ function drawHUD(pal, t) {
     ? -Math.round(Math.sin((0.28 - eggPulse) / 0.28 * Math.PI) * 3)
     : 0;
   drawSpeaker(pal, audio.mode);
-  drawStar(pal, 58, 14 + eggBob, Math.floor(t * 4) % 2);
+  // Set star scale for HUD based on user setting
+window._starScaleCurrent = window.starSizeHUD || 1;
+
+drawStar(pal, 58, 14 + eggBob, Math.floor(t * 4) % 2);
+// Reset after drawing HUD star
+window._starScaleCurrent = 1;
   drawText('x ' + pad5(state === 'playing' ? stats.eggs : bankEggs), 82, 16 + eggBob, 2, pal.fg, { gap: 2, outline: pal.bg });
 
   // Combo meter under the egg counter — fills with the streak, blinks near expiry (Fase C)
@@ -3032,7 +3036,10 @@ function render() {
   drawSeasonFx(pal, t, season);
 
   ctx.fillStyle = pal.fg;
-  for (const p of picks) drawStar(pal, p.x, p.y, p.ph);
+  // Apply game star scaling based on user setting
+window._starScaleCurrent = window.starSizeGame || 1;
+for (const p of picks) drawStar(pal, p.x, p.y, p.ph);
+window._starScaleCurrent = 1; // reset after drawing stars
   for (const o of obstacles) drawObstacle(pal, t, o);
 
   drawShadow(pal);

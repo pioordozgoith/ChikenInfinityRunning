@@ -1,102 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Chicken Runner — 1-Bit Infinity Running Game</title>
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Chicken Runner — 1-Bit Infinity Running Game</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body class="theme-mono bezel-on">
-<div id="console-chassis">
-  <!-- Console Bezel Header -->
-  <header id="console-header">
-    <div class="brand-group">
-      <div class="power-led" title="Power ON"></div>
-      <span class="brand-label">CHICKEN RUNNER // 1-BIT</span>
-    </div>
-    <div class="toolbar-actions">
-      <button id="btn-roster" class="bezel-btn" title="Choose Chicken (C)">CHICKEN</button>
-      <button id="btn-theme" class="bezel-btn" title="Cycle 1-Bit Themes (T)">THEME</button>
-      <button id="btn-audio" class="bezel-btn" title="Cycle Audio Modes (M)">SOUND ALL</button>
-      <button id="btn-bezel" class="bezel-btn" title="Toggle Bezel (B)">BEZEL</button>
-      <button id="btn-fullscreen" class="bezel-btn" title="Toggle Fullscreen (F)">FULL</button>
-      <button id="btn-clear" class="bezel-btn" title="Wipe all saved data on this browser">CLEAR</button>
-    </div>
-  </header>
-
-  <!-- Screen Enclosure -->
-  <div id="screen-enclosure">
-    <div id="screen-glare"></div>
-    <canvas id="game" width="960" height="280"></canvas>
-    <!-- Star Size Adjustment Panel -->
-    <button id="toggleStarPanel" style="position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:1001;background:#333;color:#eee;border:none;padding:6px 4px;cursor:pointer;writing-mode:vertical-lr;font-size:11px;border-radius:4px 0 0 4px;">⚙ Stars</button>
-    <div id="starSizePanel" style="position:fixed;right:0;top:0;width:220px;height:100%;background:#222;color:#eee;padding:12px;overflow:auto;box-sizing:border-box;z-index:1000;transition:transform .2s ease;">
-      <h3 style="margin-top:0;">Star Size Settings</h3>
-      <div style="margin-bottom:12px;">
-        <label for="hudSizeSlider">HUD Star Size</label><br/>
-        <input type="range" id="hudSizeSlider" min="0.5" max="3" step="0.05" style="width:100%;"/>
-        <input type="number" id="hudSizeNumber" min="0.5" max="3" step="0.05" style="width:100%;margin-top:4px;"/>
+  <div id="console-chassis">
+    <!-- Console Bezel Header -->
+    <header id="console-header">
+      <div class="brand-group">
+        <div class="power-led" title="Power ON"></div>
+        <span class="brand-label">CHICKEN RUNNER // 1-BIT</span>
       </div>
-      <div style="margin-bottom:12px;">
-        <label for="gameSizeSlider">Game Star Size</label><br/>
-        <input type="range" id="gameSizeSlider" min="0.5" max="3" step="0.05" style="width:100%;"/>
-        <input type="number" id="gameSizeNumber" min="0.5" max="3" step="0.05" style="width:100%;margin-top:4px;"/>
+      <div class="toolbar-actions">
+        <button id="btn-roster" class="bezel-btn" title="Choose Chicken (C)">CHICKEN</button>
+        <button id="btn-theme" class="bezel-btn" title="Cycle 1-Bit Themes (T)">THEME</button>
+        <button id="btn-audio" class="bezel-btn" title="Cycle Audio Modes (M)">SOUND ALL</button>
+        <button id="btn-bezel" class="bezel-btn" title="Toggle Bezel (B)">BEZEL</button>
+        <button id="btn-fullscreen" class="bezel-btn" title="Toggle Fullscreen (F)">FULL</button>
+        <button id="btn-clear" class="bezel-btn" title="Wipe all saved data on this browser">CLEAR</button>
       </div>
-      <button id="saveStarSizeBtn" style="width:100%;padding:6px;background:#555;color:#fff;border:none;cursor:pointer;">Save (persist)</button>
+    </header>
+
+    <!-- Screen Enclosure -->
+    <div id="screen-enclosure">
+      <div id="screen-glare"></div>
+      <canvas id="game" width="960" height="280"></canvas>
+      <!-- Settings Panel -->
+      <button id="toggleStarPanel"
+        style="position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:1001;background:linear-gradient(135deg,#3a3a3a,#222);color:#ccc;border:1px solid #555;border-right:none;padding:8px 5px;cursor:pointer;writing-mode:vertical-lr;font-size:11px;border-radius:6px 0 0 6px;letter-spacing:1px;box-shadow:-2px 0 8px rgba(0,0,0,.4);transition:right .2s ease;">⚙
+        Settings</button>
+      <div id="starSizePanel"
+        style="position:fixed;right:0;top:0;width:260px;height:100%;background:linear-gradient(180deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:#e0e0e0;padding:0;overflow:auto;box-sizing:border-box;z-index:1000;transition:transform .2s ease;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:-4px 0 20px rgba(0,0,0,.5);">
+
+        <!-- Panel Header -->
+        <div style="padding:16px 18px 12px;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(255,255,255,.08);">
+          <h3 style="margin:0;font-size:16px;font-weight:600;letter-spacing:1.5px;color:#fff;">⚙ SETTINGS</h3>
+          <p style="margin:4px 0 0;font-size:10px;color:#888;letter-spacing:.5px;">Adjust visual parameters</p>
+        </div>
+
+        <!-- Stars Section -->
+        <div style="padding:14px 18px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span style="font-size:14px;">★</span>
+            <h4 style="margin:0;font-size:13px;font-weight:600;letter-spacing:1px;color:#e8b931;">STARS</h4>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(232,185,49,.4),transparent);"></div>
+          </div>
+
+          <!-- HUD Star Size -->
+          <div
+            style="margin-bottom:14px;background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);">
+            <label for="hudSizeSlider"
+              style="font-size:11px;font-weight:500;letter-spacing:.5px;color:#aaa;display:block;margin-bottom:6px;">HUD
+              Star Size</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="range" id="hudSizeSlider" min="0.5" max="3" step="0.05"
+                style="flex:1;accent-color:#e8b931;height:4px;" />
+              <input type="number" id="hudSizeNumber" min="0.5" max="3" step="0.05"
+                style="width:54px;background:#111;color:#fff;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px;text-align:center;" />
+            </div>
+          </div>
+
+          <!-- Game Star Size -->
+          <div
+            style="margin-bottom:14px;background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);">
+            <label for="gameSizeSlider"
+              style="font-size:11px;font-weight:500;letter-spacing:.5px;color:#aaa;display:block;margin-bottom:6px;">Game
+              Star Size</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="range" id="gameSizeSlider" min="0.5" max="3" step="0.05"
+                style="flex:1;accent-color:#e8b931;height:4px;" />
+              <input type="number" id="gameSizeNumber" min="0.5" max="3" step="0.05"
+                style="width:54px;background:#111;color:#fff;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px;text-align:center;" />
+            </div>
+          </div>
+
+          <!-- Death Star Size (dizzy stars above head) -->
+          <div
+            style="margin-bottom:14px;background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.06);">
+            <label for="deathStarSlider"
+              style="font-size:11px;font-weight:500;letter-spacing:.5px;color:#aaa;display:block;margin-bottom:6px;">Death
+              Stars Size <span style="font-size:9px;color:#666;">(dizzy orbit)</span></label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="range" id="deathStarSlider" min="0.3" max="4" step="0.1"
+                style="flex:1;accent-color:#e8b931;height:4px;" />
+              <input type="number" id="deathStarNumber" min="0.3" max="4" step="0.1"
+                style="width:54px;background:#111;color:#fff;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px;text-align:center;" />
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <button id="saveStarSizeBtn"
+            style="width:100%;padding:8px 0;background:linear-gradient(135deg,#e8b931,#d4a017);color:#111;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;letter-spacing:1px;transition:opacity .15s;">💾
+            SAVE</button>
+          <!-- Reset Button -->
+          <button id="resetSettingsBtn"
+            style="width:100%;padding:8px 0;margin-top:8px;background:rgba(255,255,255,.08);color:#aaa;border:1px solid rgba(255,255,255,.1);border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;letter-spacing:.5px;transition:all .15s;">↺
+            RESET DEFAULTS</button>
+        </div>
+      </div>
+
+      <div id="toast" class="toast-hidden"></div>
     </div>
 
-    <div id="toast" class="toast-hidden"></div>
+    <!-- Mobile / Virtual Touch Controls -->
+    <div id="touch-controls" class="touch-bar">
+      <button id="btn-touch-slide" class="touch-btn btn-slide" aria-label="Slide">
+        <span class="touch-icon">▼</span>
+        <span class="touch-text">SLIDE</span>
+      </button>
+      <div class="console-grille">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <button id="btn-touch-jump" class="touch-btn btn-jump" aria-label="Jump">
+        <span class="touch-icon">▲</span>
+        <span class="touch-text">JUMP</span>
+      </button>
+    </div>
   </div>
 
-  <!-- Mobile / Virtual Touch Controls -->
-  <div id="touch-controls" class="touch-bar">
-    <button id="btn-touch-slide" class="touch-btn btn-slide" aria-label="Slide">
-      <span class="touch-icon">▼</span>
-      <span class="touch-text">SLIDE</span>
-    </button>
-    <div class="console-grille">
-      <span></span><span></span><span></span><span></span><span></span>
-    </div>
-    <button id="btn-touch-jump" class="touch-btn btn-jump" aria-label="Jump">
-      <span class="touch-icon">▲</span>
-      <span class="touch-text">JUMP</span>
-    </button>
-  </div>
-</div>
+  <footer id="console-footer">
+    <span>[SPACE / UP / RIGHT TAP] JUMP</span>
+    <span class="sep">·</span>
+    <span>[DOWN / S / LEFT TAP] SLIDE</span>
+    <span class="sep">·</span>
+    <span>[C] CHICKEN</span>
+    <span class="sep">·</span>
+    <span>[P] PAUSE</span>
+    <span class="sep">·</span>
+    <span>[M] AUDIO</span>
+    <span class="sep">·</span>
+    <span>[T] THEME</span>
+  </footer>
 
-<footer id="console-footer">
-  <span>[SPACE / UP / RIGHT TAP] JUMP</span>
-  <span class="sep">·</span>
-  <span>[DOWN / S / LEFT TAP] SLIDE</span>
-  <span class="sep">·</span>
-  <span>[C] CHICKEN</span>
-  <span class="sep">·</span>
-  <span>[P] PAUSE</span>
-  <span class="sep">·</span>
-  <span>[M] AUDIO</span>
-  <span class="sep">·</span>
-  <span>[T] THEME</span>
-</footer>
-
-<script src="js/game.js"></script>
-    <script>
+  <script src="js/game.js"></script>
+  <script>
     document.addEventListener('DOMContentLoaded', () => {
       const hudSlider = document.getElementById('hudSizeSlider');
       const hudNumber = document.getElementById('hudSizeNumber');
       const gameSlider = document.getElementById('gameSizeSlider');
       const gameNumber = document.getElementById('gameSizeNumber');
+      const deathSlider = document.getElementById('deathStarSlider');
+      const deathNumber = document.getElementById('deathStarNumber');
       const saveBtn = document.getElementById('saveStarSizeBtn');
+      const resetBtn = document.getElementById('resetSettingsBtn');
 
       const loadValues = () => {
         const hud = parseFloat(localStorage.getItem('starSizeHUD')) || 0.85;
         const game = parseFloat(localStorage.getItem('starSizeGame')) || 0.85;
+        const death = parseFloat(localStorage.getItem('deathStarSize')) || 1.8;
         hudSlider.value = hud; hudNumber.value = hud;
         gameSlider.value = game; gameNumber.value = game;
+        deathSlider.value = death; deathNumber.value = death;
       };
 
       const applyLive = () => {
         window.starSizeHUD = parseFloat(hudSlider.value) || 1;
         window.starSizeGame = parseFloat(gameSlider.value) || 1;
+        window.deathStarSize = parseFloat(deathSlider.value) || 1;
       };
 
       const sync = (slider, number) => {
@@ -106,8 +171,10 @@
         });
         number.addEventListener('input', () => {
           let v = parseFloat(number.value);
-          if (isNaN(v) || v < 0.5) v = 0.5;
-          if (v > 3) v = 3;
+          const min = parseFloat(slider.min) || 0.3;
+          const max = parseFloat(slider.max) || 3;
+          if (isNaN(v) || v < min) v = min;
+          if (v > max) v = max;
           slider.value = v; number.value = v;
           applyLive();
         });
@@ -115,26 +182,54 @@
 
       sync(hudSlider, hudNumber);
       sync(gameSlider, gameNumber);
+      sync(deathSlider, deathNumber);
 
       saveBtn.addEventListener('click', () => {
         localStorage.setItem('starSizeHUD', hudSlider.value);
         localStorage.setItem('starSizeGame', gameSlider.value);
+        localStorage.setItem('deathStarSize', deathSlider.value);
         applyLive();
+        saveBtn.textContent = '✓ SAVED!';
+        saveBtn.style.background = 'linear-gradient(135deg,#4CAF50,#388E3C)';
+        saveBtn.style.color = '#fff';
+        setTimeout(() => {
+          saveBtn.textContent = '💾 SAVE';
+          saveBtn.style.background = 'linear-gradient(135deg,#e8b931,#d4a017)';
+          saveBtn.style.color = '#111';
+        }, 1200);
       });
 
       loadValues();
       applyLive();
 
+      // Reset to defaults
+      resetBtn.addEventListener('click', () => {
+        hudSlider.value = 0.85; hudNumber.value = 0.85;
+        gameSlider.value = 0.85; gameNumber.value = 0.85;
+        deathSlider.value = 1; deathNumber.value = 1;
+        localStorage.setItem('starSizeHUD', '0.85');
+        localStorage.setItem('starSizeGame', '0.85');
+        localStorage.setItem('deathStarSize', '1.8');
+        applyLive();
+        resetBtn.textContent = '✓ RESET!';
+        resetBtn.style.color = '#fff';
+        setTimeout(() => {
+          resetBtn.textContent = '↺ RESET DEFAULTS';
+          resetBtn.style.color = '#aaa';
+        }, 1200);
+      });
+
       // Toggle panel visibility
       const panel = document.getElementById('starSizePanel');
       const toggleBtn = document.getElementById('toggleStarPanel');
+      const panelWidth = '260px';
       const hidden = localStorage.getItem('starPanelHidden') === '1';
       if (hidden) { panel.style.transform = 'translateX(100%)'; toggleBtn.style.right = '0'; }
       toggleBtn.addEventListener('click', () => {
         const isHidden = panel.style.transform === 'translateX(100%)';
         if (isHidden) {
           panel.style.transform = 'translateX(0)';
-          toggleBtn.style.right = '220px';
+          toggleBtn.style.right = panelWidth;
           localStorage.setItem('starPanelHidden', '0');
         } else {
           panel.style.transform = 'translateX(100%)';
@@ -142,8 +237,9 @@
           localStorage.setItem('starPanelHidden', '1');
         }
       });
-      if (!hidden) toggleBtn.style.right = '220px';
+      if (!hidden) toggleBtn.style.right = panelWidth;
     });
-    </script>
+  </script>
 </body>
+
 </html>

@@ -11,6 +11,7 @@ const S = 3;                                      // sprite scale: 1 sprite px =
 // Star scaling factors (loaded from localStorage). These affect only the star sprite.
 window.starSizeHUD = parseFloat(localStorage.getItem('starSizeHUD')) || 0.85;
 window.starSizeGame = parseFloat(localStorage.getItem('starSizeGame')) || 0.85;
+window.deathStarSize = parseFloat(localStorage.getItem('deathStarSize')) || 1.8;
 window._starScaleCurrent = 1; // temporary multiplier set before each drawStar call
 const STAND_W = 16 * S, STAND_H = 22 * S;        // chicken: 48 x 66
 const SLIDE_W = 22 * S, SLIDE_H = 12 * S;        // chicken duck: 66 x 36
@@ -3007,9 +3008,10 @@ function drawPlayer(pal, t) {
     ctx.fillStyle = pal.fg;
     // Orbit centre = the seated head (sprite y2..6 → screen GROUND-30..-18, x≈bx+30)
     const hx = bx + 30, hy = GROUND - 30;
+    const dsScale = Math.max(1, Math.round(window.deathStarSize || 1));
     for (const f of deathStars) {
       const sx = Math.round(hx + Math.cos(f.a) * f.r), sy = Math.round(hy + Math.sin(f.a) * f.r * 0.55);
-      drawText('★', sx, sy, 1, pal.fg, { align: 'center', outline: pal.bg });
+      drawText('★', sx, sy, dsScale, pal.fg, { align: 'center', outline: pal.bg });
     }
     return;
   }

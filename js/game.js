@@ -8,6 +8,10 @@
 // ---------- constants ----------
 const W = 960, H = 280, GROUND = 225;
 const S = 3;                                      // sprite scale: 1 sprite px = 3 canvas px
+// Star scaling factors (loaded from localStorage). These affect only the star sprite.
+window.starSizeHUD = parseFloat(localStorage.getItem('starSizeHUD')) || 1;
+window.starSizeGame = parseFloat(localStorage.getItem('starSizeGame')) || 1;
+window._starScaleCurrent = 1; // temporary multiplier set before each drawStar call
 const STAND_W = 16 * S, STAND_H = 22 * S;        // chicken: 48 x 66
 const SLIDE_W = 22 * S, SLIDE_H = 12 * S;        // chicken duck: 66 x 36
 const SLIDE_OFF = STAND_H - SLIDE_H;             // 30px offset when ducking
@@ -1307,20 +1311,19 @@ function drawChicken(pal, x, yTop, mode, frame, blinkOn, chickenIdx, hatIdx) {
   drawHat(pal, hatIdx, x, yTop, mode, frame, chickenIdx);
 }
 
-// ---------- collectible star (was the egg; currency renamed to STARS) ----------
-// Same 5x6 footprint as the egg so pickup hitboxes don't change.
+// ---------- collectible star (1-bit retro arcade star) ----------
 function drawStar(pal, x, y, ph) {
+  const s = S * (window._starScaleCurrent || 1);
   const s = S;
   const sx = Math.round(x), sy = Math.round(y);
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
-  R(2, 0, 1, 1);                 // top point
-  R(1, 1, 3, 1);                 // shoulders
-  R(0, 2, 5, 1);                 // full arms
-  R(1, 3, 3, 1);                 // body
-  R(0, 4, 1, 1); R(4, 4, 1, 1);  // spread legs
-  ctx.fillStyle = pal.bg;        // twinkle: shine hops side to side
-  if (ph) R(1, 2, 1, 1); else R(3, 2, 1, 1);
+  R(3, 0, 1, 1);                 // top point
+  R(2, 1, 3, 1);                 // shoulders
+  R(0, 2, 7, 1);                 // full arms
+  R(1, 3, 5, 1);                 // waist / chest
+  R(1, 4, 2, 1); R(4, 4, 2, 1);  // upper legs & central notch
+  R(0, 5, 2, 1); R(5, 5, 2, 1);  // lower legs & feet flaring out
 }
 
 // ---------- feather (death puff) ----------
@@ -2050,7 +2053,7 @@ function update(dt) {
       if (p.t > 0.35) { p.t = 0; p.ph ^= 1; }
       if (p.x < -30) { picks.splice(i, 1); continue; }
 
-      if (overlap(pb, { x: p.x + 3, y: p.y + 5, w: 9, h: 9 })) {
+      if (overlap(pb, { x: p.x + 3, y: p.y + 2, w: 15, h: 14 })) {
         picks.splice(i, 1);
         stats.eggs++;
         eggStreak++;

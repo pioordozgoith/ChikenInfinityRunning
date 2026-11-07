@@ -2,7 +2,7 @@
  
 `Jogo de navegador` · `Endless runner` · `JavaScript` · `HTML5 Canvas` · `Pixel art` · `Retro` · `WebAudio`
 
-Chicken Runner é um jogo de corrida infinita em estilo retrô, desenvolvido em JavaScript puro com HTML5 Canvas. O jogador controla uma galinha que corre por um cenário arcade 1-bit, desviando de obstáculos e coletando ovos.
+Chicken Runner é um jogo de corrida infinita em estilo retrô, desenvolvido em JavaScript puro com HTML5 Canvas. O jogador controla uma galinha que corre por um cenário arcade 1-bit, desviando de obstáculos e coletando estrelas.
 
 ![Imagem de referência do Chicken Runner](Ref/RefImage.png)
 
@@ -14,11 +14,11 @@ Abra `index.html` em um navegador moderno. Não é necessário instalar dependê
 
 - Cinco personagens jogáveis (cosméticos, sem vantagem de gameplay)
 - Pulos, deslizes e obstáculos
-- Pontuação, Hall of Fame (top 5 local com distância, ovos e data)
-- Ovos coletáveis que viram moeda no banco, para comprar chapéus na loja
+- Pontuação, Hall of Fame (top 5 local com distância, estrelas e data)
+- Estrelas coletáveis que viram moeda no banco, para comprar chapéus na loja
 - Sistema de XP com níveis e árvore de skills de evolução (3 ramos)
 - Seis conquistas (badges) desbloqueáveis durante as corridas
-- Tutorial interativo de treino com recompensa única (+50 ovos e +50 XP)
+- Tutorial interativo de treino com recompensa única (+50 estrelas e +50 XP)
 - Quatro estações e ciclo dia/noite que mudam ao longo da corrida
 - Cinco temas visuais 1-bit (B&W, DMG, AMBER, MAC, CYBER)
 - Efeitos sonoros e música sintetizados com WebAudio (modos ALL, SFX e OFF)
@@ -45,21 +45,21 @@ Cinco galinhas jogáveis, escolhidas no menu **CHICKEN** do menu principal ou pe
 
 ## Hats
 
-Os chapéus são **cosméticos** e não afetam o gameplay. Eles são comprados com os **ovos do banco** (coletados nas corridas e depositados ao fim de cada run) na **HAT SHOP** do menu principal, e podem ser trocados quando quiser.
+Os chapéus são **cosméticos** e não afetam o gameplay. Eles são comprados com as **estrelas do banco** (coletadas nas corridas e depositadas ao fim de cada run) na **HAT SHOP** do menu principal, e podem ser trocados quando quiser.
 
 |Grad Cap|Top Hat|Viking Helm|
 |--|--|--|
 |![grad](Ref/Hats/Grad.png)|![top](Ref/Hats/Top.png)|![vik](Ref/Hats/Vik.png)|
-|**GRAD CAP**: 20 ovos: excelência acadêmica.|**TOP HAT**: 35 ovos: galinha elegante e bem-vestida.|**VIKING HELM**: 60 ovos: conquistador emplumado.|
+|**GRAD CAP**: 20 estrelas: excelência acadêmica.|**TOP HAT**: 35 estrelas: galinha elegante e bem-vestida.|**VIKING HELM**: 60 estrelas: conquistador emplumado.|
 
 Os demais chapéus do jogo (sem imagem de referência no repositório):
 
 |Chapéu|Custo|Descrição|
 |--|--|--|
 |NONE|Grátis|Cabeça nua clássica: o padrão, já vem liberado.|
-|RIBBON COMB|15 ovos|Laço xadrez: um toque fofo e colorido.|
-|CHEF TOQUE|50 ovos|Touca de chef: alta culinária ensolarada.|
-|EGG CROWN|80 ovos|Coroa de ovos: herdeiro real do ninho.|
+|RIBBON COMB|15 estrelas|Laço xadrez: um toque fofo e colorido.|
+|CHEF TOQUE|50 estrelas|Touca de chef: alta culinária ensolarada.|
+|EGG CROWN|80 estrelas|Coroa de ovos: herdeiro real do ninho.|
 
 ## Skill Tree
 
@@ -71,10 +71,10 @@ A árvore de evolução é aberta pelo menu **SKILLS** e usa **XP como moeda**: 
 |--|--|--|--|
 |NEST OF EVOLUTION|50|:|Ponto de entrada: abre os três ramos da árvore.|
 |ARMOR FEATHERS|120|Nest of Evolution|Um escudo por corrida absorve uma colisão.|
-|DOUBLE SEQUENCE|100|Nest of Evolution|Ovos valem 30 de pontuação e o combo dura 2,4 s.|
+|DOUBLE SEQUENCE|100|Nest of Evolution|Estrelas valem 30 de pontuação e o combo dura 2,4 s.|
 |ELASTIC JUMP|100|Nest of Evolution|Pulo 6% mais alto e janela de pulo (buffer) mais longa.|
 |ESCAPE REFLEX|200|Armor Feathers|Após o escudo bloquear um golpe: 2 s de invencibilidade e velocidade −10% por 3 s.|
-|BLAZING HEN|180|Double Sequence|Com combo x8 ou maior, os ovos valem o dobro.|
+|BLAZING HEN|180|Double Sequence|Com combo x8 ou maior, as estrelas valem o dobro.|
 |SLIDE BLADE|180|Elastic Jump|Hitbox do deslize 20% menor.|
 |GOLDEN HEN|320|Escape Reflex|O escudo se renova a cada 500 m percorridos.|
 |PERFECT HUNT|300|Blazing Hen|Desvio quase-acerto (near-miss) vale 25 pontos em vez de 10.|
@@ -85,9 +85,9 @@ A árvore de evolução é aberta pelo menu **SKILLS** e usa **XP como moeda**: 
 O XP alimenta os níveis e é a moeda da árvore de skills. Como obtê-lo:
 
 - **Distância:** 1 XP a cada 10 m percorridos.
-- **Ovos:** +2 XP por ovo coletado (eles também entram no banco ao fim da corrida).
+- **Estrelas:** +2 XP por estrela coletada (elas também entram no banco ao fim da corrida).
 - **Conquistas:** +25 XP por badge desbloqueado.
-- **Treino:** +50 XP (e +50 ovos) na conclusão do tutorial.
+- **Treino:** +50 XP (e +50 estrelas) na conclusão do tutorial.
 
 O nível sobe automaticamente conforme o XP acumulado (o custo por nível aumenta a cada avanço). Tudo fica salvo no LocalStorage.
 
@@ -100,7 +100,7 @@ Seis badges desbloqueados durante as corridas (cada um concede +25 XP):
 |FIRST FLIGHT|Completar a primeira corrida.|
 |NIGHT OWL|Sobreviver ao período noturno.|
 |FOUR SEASONS|Alcançar a neve do inverno.|
-|EGG MAGNATE|Ter 50 ovos (na corrida ou no banco).|
+|STAR MAGNATE|Ter 50 estrelas (na corrida ou no banco).|
 |SPEED DEMON|Ultrapassar 750 px/s de velocidade.|
 |CLOSE CALL|Acumular 3 desvios quase-acerto.|
 

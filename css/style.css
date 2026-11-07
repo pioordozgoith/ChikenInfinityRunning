@@ -22,7 +22,8 @@ body.theme-mono {
 body.theme-gameboy {
   --bg: #0f380f;
   --fg: #8bac0f;
-  --chassis: #1e3f1e;
+  /* was #1e3f1e: brand label measured 4.49:1 (AA needs 4.5) */
+  --chassis: #1c3b1c;
   --chassis-border: #355f35;
   --chassis-inset: #092409;
   --accent: #8bac0f;
@@ -78,7 +79,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 16px;
   user-select: none;
   -webkit-user-select: none;
   transition: background 0.2s ease, color 0.2s ease;
@@ -127,16 +128,16 @@ body:not(.bezel-on) .console-grille {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 0 4px;
+  margin-bottom: 16px;
+  padding: 0 8px;
   border-bottom: 2px solid var(--chassis-border);
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
 .brand-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .power-led {
@@ -175,7 +176,7 @@ body.is-playing .power-led {
 
 .toolbar-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -268,7 +269,11 @@ canvas#game {
   z-index: 100;
   transition: opacity 0.25s ease, transform 0.25s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
+  /* Long messages (skill lock, tutorial reward) wrapped on narrow screens
+     instead of overflowing: nowrap measured ~390px on a 360px viewport. */
+  white-space: normal;
+  max-width: calc(100% - 24px);
+  text-align: center;
 }
 
 /* Arcade pop-in: overshoots and settles, instead of a flat fade */
@@ -306,7 +311,7 @@ canvas#game {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 14px;
+  margin-top: 16px;
   gap: 16px;
 }
 
@@ -368,15 +373,15 @@ canvas#game {
   box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-/* Footer Keyboard Shortcuts */
+/* Footer Keyboard Shortcuts — full-strength color: the old 0.75 opacity
+   measured ~3.5:1 on the DMG theme (below WCAG AA 4.5:1). */
 #console-footer {
-  margin-top: 14px;
+  margin-top: 16px;
   font-size: 11px;
   letter-spacing: 1px;
   font-variant-numeric: tabular-nums;
   text-align: center;
   color: var(--fg);
-  opacity: 0.75;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -392,17 +397,17 @@ canvas#game {
    ========================================= */
 @media (max-width: 680px) {
   body {
-    padding: 6px;
+    padding: 8px;
     justify-content: flex-start;
   }
   
   body.bezel-on #console-chassis {
-    padding: 10px;
+    padding: 8px;
     border-width: 2px;
   }
   
   .touch-bar {
-    margin-top: 10px;
+    margin-top: 8px;
   }
 
   .touch-btn {
@@ -414,7 +419,7 @@ canvas#game {
   }
   
   .bezel-btn {
-    font-size: 9px;
+    font-size: 11px;
     padding: 4px 6px;
   }
   

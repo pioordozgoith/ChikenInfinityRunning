@@ -102,6 +102,46 @@
             style="width:100%;padding:8px 0;margin-top:8px;background:rgba(255,255,255,.08);color:#aaa;border:1px solid rgba(255,255,255,.1);border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;letter-spacing:.5px;transition:all .15s;">↺
             RESET DEFAULTS</button>
         </div>
+
+        <!-- Scenery Section -->
+        <div style="padding:14px 18px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span style="font-size:14px;">🏞</span>
+            <h4 style="margin:0;font-size:13px;font-weight:600;letter-spacing:1px;color:#7ec8e3;">SCENERY</h4>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(126,200,227,.4),transparent);"></div>
+          </div>
+          <div id="visScenery"
+            style="background:rgba(255,255,255,.04);border-radius:8px;padding:6px 12px;border:1px solid rgba(255,255,255,.06);">
+            <label class="vis-row"><input type="checkbox" data-vis="hills" checked> <span>BUILDINGS</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="clouds" checked> <span>CLOUDS</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="sun" checked> <span>SUN</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="moon" checked> <span>MOON</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="stars" checked> <span>SKY STARS</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="gdec" checked> <span>GROUND DECOR</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="seasonFx" checked> <span>SEASON FX</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="shadow" checked> <span>CHICKEN SHADOW</span></label>
+          </div>
+        </div>
+
+        <!-- Obstacles Section -->
+        <div style="padding:4px 18px 18px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span style="font-size:14px;">⚠</span>
+            <h4 style="margin:0;font-size:13px;font-weight:600;letter-spacing:1px;color:#f0a04c;">OBSTACLES</h4>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(240,160,76,.4),transparent);"></div>
+          </div>
+          <div id="visObstacles"
+            style="background:rgba(255,255,255,.04);border-radius:8px;padding:6px 12px;border:1px solid rgba(255,255,255,.06);">
+            <label class="vis-row"><input type="checkbox" data-vis="spike" checked> <span>SPIKE</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="barrier" checked> <span>BARRIER</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="fence" checked> <span>FENCE</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="fox" checked> <span>FOX</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="falcon" checked> <span>FALCON</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="owl" checked> <span>OWL</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="stack" checked> <span>STACK</span></label>
+            <label class="vis-row"><input type="checkbox" data-vis="hay" checked> <span>HAY</span></label>
+          </div>
+        </div>
       </div>
 
       <div id="toast" class="toast-hidden"></div>
@@ -202,6 +242,24 @@
       loadValues();
       applyLive();
 
+      // Scenery/obstacle visibility: checkbox → window.VIS (live) + localStorage.
+      // game.js reads window.VIS via visOn(); missing key = everything on.
+      const VIS_KEY = 'piRunnerVis';
+      const visBoxes = Array.from(document.querySelectorAll('[data-vis]'));
+      const readVis = () => {
+        let stored = {};
+        try { stored = JSON.parse(localStorage.getItem(VIS_KEY) || '{}') || {}; } catch (e) {}
+        window.VIS = stored;
+        visBoxes.forEach(b => { b.checked = stored[b.dataset.vis] !== 0; });
+      };
+      readVis();
+      visBoxes.forEach(b => b.addEventListener('change', () => {
+        const cur = (window.VIS && typeof window.VIS === 'object') ? window.VIS : {};
+        cur[b.dataset.vis] = b.checked ? 1 : 0;
+        window.VIS = cur;
+        try { localStorage.setItem(VIS_KEY, JSON.stringify(cur)); } catch (e) {}
+      }));
+
       // Reset to defaults
       resetBtn.addEventListener('click', () => {
         hudSlider.value = 0.85; hudNumber.value = 0.85;
@@ -210,6 +268,9 @@
         localStorage.setItem('starSizeHUD', '0.85');
         localStorage.setItem('starSizeGame', '0.85');
         localStorage.setItem('deathStarSize', '1.8');
+        try { localStorage.removeItem('piRunnerVis'); } catch (e) {}
+        window.VIS = {};
+        document.querySelectorAll('[data-vis]').forEach(b => { b.checked = true; });
         applyLive();
         resetBtn.textContent = '✓ RESET!';
         resetBtn.style.color = '#fff';

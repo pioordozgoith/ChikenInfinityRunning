@@ -219,6 +219,34 @@ body.is-playing .power-led {
   transition: none;
 }
 
+/* Settings panel: scenery/obstacle visibility toggle rows */
+.vis-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 2px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .5px;
+  color: #bbb;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, .05);
+  transition: color .15s;
+}
+
+.vis-row:last-child { border-bottom: none; }
+
+.vis-row:hover { color: #fff; }
+
+.vis-row input {
+  accent-color: #e8b931;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  margin: 0;
+}
+
 /* Screen Enclosure */
 #screen-enclosure {
   position: relative;

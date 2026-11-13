@@ -66,6 +66,15 @@ const BADGES_KEY = 'piRunnerBadges';
 const THEME_KEY = 'piRunnerTheme';
 const AUDIO_KEY = 'piRunnerAudio';
 const BEZEL_KEY = 'piRunnerBezel';
+const VIS_KEY = 'piRunnerVis';
+
+// Visibility toggles do painel Settings (index.html): {} = tudo ligado,
+// chave com 0 = desligado. O painel muta window.VIS em cada checkbox.
+try {
+  const v = JSON.parse(localStorage.getItem(VIS_KEY) || '{}');
+  window.VIS = (v && typeof v === 'object') ? v : {};
+} catch (e) { window.VIS = {}; }
+const visOn = k => !window.VIS || window.VIS[k] !== 0;
 
 // ---------- the 5 chickens (rooster roster) ----------
 const CHICKENS = [
@@ -1472,7 +1481,7 @@ function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y 
 // ---------- spawning ----------
 function spawnObstacle() {
   const pool = [];
-  const add = (t, w) => { for (let i = 0; i < w; i++) pool.push(t); };
+  const add = (t, w) => { if (visOn(t)) for (let i = 0; i < w; i++) pool.push(t); };
   if (score < 260) { add('spike', 3); add('fence', 2); }
   else {
     add('spike', 3); add('barrier', 2); add('fence', 2);
@@ -1481,6 +1490,7 @@ function spawnObstacle() {
     if (score > 400 && nightTarget) add('owl', 2);
     if (score > 600) { add('stack', 2); add('hay', 2); }
   }
+  if (!pool.length) { nextGap = speed * 0.72 + rand(40, 300); return; }  // tudo desligado no Settings
   const type = pool[(Math.random() * pool.length) | 0];
   const o = makeObstacle(type, W + 40);
   obstacles.push(o);
@@ -2223,9 +2233,10 @@ function drawGround(pal, ssn) {
   ctx.fillStyle = pal.fg;
   const step = 48;
   const j0 = Math.floor(groundOff / step) - 1;
+  const gdec = visOn('gdec');   // Settings: decorações do chão (pedras/flor/neve)
   for (let j = j0; j * step - groundOff < W + step; j++) {
     const sx = Math.round(j * step - groundOff);
-    const r = ((j % 40) + 40) % 40;
+    const r = gdec ? ((j % 40) + 40) % 40 : -1;
     if (r === 3) { box(sx + 8, GROUND - 4, 24, 4); box(sx + 14, GROUND - 7, 12, 3); }
     else if (r === 11 || r === 27) { box(sx + 6, GROUND + 8, 4, 3); box(sx + 22, GROUND + 14, 3, 3); box(sx + 34, GROUND + 9, 5, 2); }
     else if (r === 19 || r === 33) { box(sx + 10, GROUND + 13, 14, 2); box(sx + 32, GROUND + 9, 6, 2); }
@@ -2281,7 +2292,7 @@ function drawCloud(pal, cl) {
 
 function drawSky(pal, t, isNight, ssn) {
   if (!isNight) {
-    if (ssn !== 1) return;
+    if (ssn !== 1 || !visOn('sun')) return;
     ctx.fillStyle = pal.fg;
     const cx = 136, cy = 46;
     box(cx - 6, cy - 13, 12, 3); box(cx - 10, cy - 10, 20, 3); box(cx - 13, cy - 7, 26, 14);
@@ -2290,15 +2301,19 @@ function drawSky(pal, t, isNight, ssn) {
     box(cx - 18, cy - 1, 3, 3); box(cx + 15, cy - 1, 3, 3);
     return;
   }
-  ctx.fillStyle = pal.fg;
-  for (const s of skyStars) {
-    const on = Math.sin(t * 2 + s.p) > -0.35;
-    if (!on) continue;
-    const sx = Math.round(s.x), sy = Math.round(s.y);
-    if (s.big) { box(sx - 2, sy, 6, 2); box(sx, sy - 2, 2, 6); }
-    else box(sx, sy, 2, 2);
+  if (visOn('stars')) {
+    ctx.fillStyle = pal.fg;
+    for (const s of skyStars) {
+      const on = Math.sin(t * 2 + s.p) > -0.35;
+      if (!on) continue;
+      const sx = Math.round(s.x), sy = Math.round(s.y);
+      if (s.big) { box(sx - 2, sy, 6, 2); box(sx, sy - 2, 2, 6); }
+      else box(sx, sy, 2, 2);
+    }
   }
-  box(132, 30, 16, 4); box(128, 34, 18, 4); box(124, 38, 20, 16); box(128, 54, 18, 4); box(132, 58, 16, 4);
+  if (visOn('moon')) {
+    box(132, 30, 16, 4); box(128, 34, 18, 4); box(124, 38, 20, 16); box(128, 54, 18, 4); box(132, 58, 16, 4);
+  }
 }
 
 function drawSeasonFx(pal, t, ssn) {
@@ -3035,10 +3050,10 @@ function render() {
   ctx.fillRect(-24, -24, W + 48, H + 48);
 
   drawSky(pal, t, nightTarget, season);
-  drawHills(pal, season);
-  for (const cl of clouds) drawCloud(pal, cl);
+  if (visOn('hills')) drawHills(pal, season);
+  if (visOn('clouds')) for (const cl of clouds) drawCloud(pal, cl);
   drawGround(pal, season);
-  drawSeasonFx(pal, t, season);
+  if (visOn('seasonFx')) drawSeasonFx(pal, t, season);
 
   ctx.fillStyle = pal.fg;
   // Apply game star scaling based on user setting
@@ -3047,7 +3062,7 @@ for (const p of picks) drawStar(pal, p.x, p.y, p.ph);
 window._starScaleCurrent = 1; // reset after drawing stars
   for (const o of obstacles) drawObstacle(pal, t, o);
 
-  drawShadow(pal);
+  if (visOn('shadow')) drawShadow(pal);
   drawPlayer(pal, t);
 
   ctx.fillStyle = pal.fg;

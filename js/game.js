@@ -66,6 +66,7 @@ const BADGES_KEY = 'piRunnerBadges';
 const THEME_KEY = 'piRunnerTheme';
 const AUDIO_KEY = 'piRunnerAudio';
 const BEZEL_KEY = 'piRunnerBezel';
+const CYCLE_KEY = 'piRunnerCycle';
 const VIS_KEY = 'piRunnerVis';
 
 // Visibility toggles do painel Settings (index.html): {} = tudo ligado,
@@ -608,6 +609,14 @@ function exitTutorial() {
 let state = 'menu';           // menu | playing | dead | paused | howtoplay | shop | records | badges | skills
 let score = 0, hi = 0, speed = 400, elapsed = 0;
 let nightTarget = false;
+// Day/Night cycle mode from the bezel button: 0 = auto (normal score cycles),
+// 1 = day only, 2 = night only. Persisted in localStorage.
+let cycleMode = 0;
+try {
+  const cm = parseInt(localStorage.getItem(CYCLE_KEY) || '0', 10);
+  if (cm === 1 || cm === 2) cycleMode = cm;
+} catch (e) {}
+if (cycleMode === 2) nightTarget = true;   // night-only boots into night
 let season = 0;               // 0: spring | 1: summer | 2: autumn | 3: winter
 let groundOff = 0, hillOff = 0;
 let clouds = [], skyStars = [], hills = [], picks = [], obstacles = [], parts = [], deathStars = [];
@@ -1525,7 +1534,7 @@ function resetRun() {
   invT = 0; slowT = 0;
   tutorial = false; tutStep = 0; tutFlag = false; tutOb = null; tutEggSpawned = false;
   pressBox = null;
-  nightTarget = false;
+  nightTarget = cycleMode === 2;  // night-only runs start at night
   season = 0;
   player.y = GROUND - STAND_H; player.vy = 0; player.onGround = true;
   player.ducking = false; player.buffer = 0;
@@ -1824,6 +1833,25 @@ if (domThemeBtn) domThemeBtn.addEventListener('click', () => {
 });
 const domAudioBtn = document.getElementById('btn-audio');
 if (domAudioBtn) domAudioBtn.addEventListener('click', () => audio.cycleMode());
+// Day/Night cycle: AUTO (score cycles) → DAY ONLY → NIGHT ONLY
+const CYCLE_LABELS = ['DAY AUTO', 'DAY ONLY', 'NIGHT ONLY'];
+function updateCycleBtn() {
+  const btn = document.getElementById('btn-cycle');
+  if (btn) btn.textContent = CYCLE_LABELS[cycleMode];
+}
+function setCycleMode(m) {
+  cycleMode = m % 3;
+  try { localStorage.setItem(CYCLE_KEY, String(cycleMode)); } catch (e) {}
+  // Outside a run the sky follows the mode right away; during play update() applies it.
+  if (state !== 'playing') nightTarget = cycleMode === 2;
+  updateCycleBtn();
+}
+updateCycleBtn();
+const domCycleBtn = document.getElementById('btn-cycle');
+if (domCycleBtn) domCycleBtn.addEventListener('click', () => {
+  setCycleMode(cycleMode + 1);
+  audio.click();
+});
 const domBezelBtn = document.getElementById('btn-bezel');
 if (domBezelBtn) domBezelBtn.addEventListener('click', () => {
   document.body.classList.toggle('bezel-on');
@@ -1965,11 +1993,14 @@ function update(dt) {
 
     if (stats.top >= 750) unlockBadge(4); // speed demon
 
-    const wantNight = Math.floor(score / 700) % 2 === 1;
+    // Day/Night switch — cycleMode overrides the score cycle (bezel button)
+    let wantNight = Math.floor(score / 700) % 2 === 1;
+    if (cycleMode === 1) wantNight = false;      // day only
+    else if (cycleMode === 2) wantNight = true;  // night only
     if (wantNight !== nightTarget) {
       nightTarget = wantNight;
       flash = 0.14;
-      if (nightTarget) unlockBadge(1); // night owl
+      if (nightTarget && cycleMode === 0) unlockBadge(1); // night owl (auto cycle only)
     }
 
     const wantSeason = Math.floor(score / 1000) % 4;
@@ -3121,6 +3152,7 @@ window.ChickenRunner = {
     }
     return {
       state, score, deathT, speed, flash, season,
+      night: nightTarget, cycle: cycleMode,
       onGround: player.onGround, px: player.x, next,
       eggs: stats.eggs, bank: bankEggs, activeHat,
       activeChicken, chickenName: CHICKENS[activeChicken].name

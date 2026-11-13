@@ -119,6 +119,7 @@ Seis badges desbloqueados durante as corridas (cada um concede +25 XP):
 - **Trocar personagem:** `C`
 - **Alternar áudio:** `M` (cicla ALL → SFX → OFF)
 - **Trocar tema:** `T` (B&W, DMG, AMBER, MAC, CYBER)
+- **Ciclo dia/noite:** botão `DAY AUTO` no bezel (AUTO → DAY ONLY → NIGHT ONLY)
 - **Ligar/desligar bezel do console:** `B`
 - **Tela cheia:** `F`
 - **Navegar nos menus:** mouse ou toque

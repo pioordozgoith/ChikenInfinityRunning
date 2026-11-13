@@ -80,24 +80,28 @@ const INVENTORY = {
   // p01/p02: grade nativa do raw (bloco ~30px) — 1:1 sem downscale, densidade igual ao raw
   'p01-cluck-run-jump': { rows:[4], frames:[['cluck-run-0',30,33],['cluck-run-1',29,33],['cluck-jump-0',28,32],['cluck-jump-1',27,32]] },
   'p02-cluck-poses':    { rows:[4], frames:[['cluck-fall',35,41],['cluck-duck',39,26],['cluck-peck',33,40],['cluck-dead',34,32]] },
-  'p03-rex-run-jump':   { rows:[4], frames:[['rex-run-0',16,22],['rex-run-1',16,22],['rex-jump-0',16,22],['rex-jump-1',16,22]] },
-  'p04-rex-poses':      { rows:[4], frames:[['rex-fall',16,22],['rex-duck',22,12],['rex-peck',16,22],['rex-dead',16,22]] },
-  'p05-chubby-run-jump':{ rows:[4], frames:[['chubby-run-0',16,22],['chubby-run-1',16,22],['chubby-jump-0',16,22],['chubby-jump-1',16,22]] },
-  'p06-chubby-poses':   { rows:[4], frames:[['chubby-fall',16,22],['chubby-duck',22,12],['chubby-peck',16,22],['chubby-dead',16,22]] },
-  'p07-mecha-run-jump': { rows:[4], frames:[['mecha-run-0',16,22],['mecha-run-1',16,22],['mecha-jump-0',16,22],['mecha-jump-1',16,22]] },
-  'p08-mecha-poses':    { rows:[4], frames:[['mecha-fall',16,22],['mecha-duck',22,12],['mecha-peck',16,22],['mecha-dead',16,22]] },
-  'p09-shinobi-run-jump':{ rows:[4], frames:[['shinobi-run-0',16,22],['shinobi-run-1',16,22],['shinobi-jump-0',16,22],['shinobi-jump-1',16,22]] },
-  'p10-shinobi-poses':  { rows:[4], frames:[['shinobi-fall',16,22],['shinobi-duck',22,12],['shinobi-peck',16,22],['shinobi-dead',16,22]] },
-  'p11-hats':           { rows:[6], frames:[['hat-grad',16,10],['hat-crown',16,10],['hat-ribbon',16,10],['hat-viking',16,10],['hat-top',16,10],['hat-chef',16,10]] },
-  'p12-obstacles-ground':{ rows:[5], frames:[['obs-spike',54,21],['obs-barrier',48,42],['obs-stack',36,51],['obs-fence',54,36],['obs-hay',46,46]] },
-  'p13-obstacles-animals':{ rows:[6], frames:[['obs-fox-0',58,32],['obs-fox-1',58,32],['obs-falcon-0',56,20],['obs-falcon-1',56,20],['obs-owl-0',48,20],['obs-owl-1',48,20]] },
-  'p14-items-particles':{ rows:[9], frames:[['star',7,6],['feather-0',4,4],['feather-1',4,4],['petal-0',4,4],['petal-1',4,4],['leaf-0',3,3],['leaf-1',3,3],['flake-big',7,7],['flake-small',5,5]] },
-  'p16-sky':            { rows:[4], frames:[['cloud-big',60,36],['cloud-small',40,24],['sun',36,40],['moon',30,36]] },
+  // p03-p18: grade nativa do raw (round(bbox/G)) — mesma densidade do original
+  'p03-rex-run-jump':   { rows:[4], frames:[['rex-run-0',40,41],['rex-run-1',40,41],['rex-jump-0',39,40],['rex-jump-1',40,40]] },
+  'p04-rex-poses':      { rows:[4], frames:[['rex-fall',40,43],['rex-duck',40,31],['rex-peck',34,48],['rex-dead',42,31]] },
+  'p05-chubby-run-jump':{ rows:[4], frames:[['chubby-run-0',27,31],['chubby-run-1',28,31],['chubby-jump-0',27,29],['chubby-jump-1',27,29]] },
+  'p06-chubby-poses':   { rows:[4], frames:[['chubby-fall',28,32],['chubby-duck',29,19],['chubby-peck',25,27],['chubby-dead',33,17]] },
+  'p07-mecha-run-jump': { rows:[4], frames:[['mecha-run-0',50,58],['mecha-run-1',49,60],['mecha-jump-0',52,60],['mecha-jump-1',52,57]] },
+  // p08: detecção automática funde fall+duck e pega ruído → corte manual
+  'p08-mecha-poses':    { rows:[4], cells:[[60,701],[701,1400],[1400,2110],[2110,2752]], frames:[['mecha-fall',55,64],['mecha-duck',60,39],['mecha-peck',59,46],['mecha-dead',46,48]] },
+  'p09-shinobi-run-jump':{ rows:[4], frames:[['shinobi-run-0',28,29],['shinobi-run-1',28,30],['shinobi-jump-0',27,36],['shinobi-jump-1',26,32]] },
+  'p10-shinobi-poses':  { rows:[4], frames:[['shinobi-fall',28,41],['shinobi-duck',27,24],['shinobi-peck',27,30],['shinobi-dead',28,25]] },
+  // p11-p18: densidade 1:1 do raw + caixa na proporção do dest do jogo
+  // (spr() estica frame→dest; caixa com aspecto do dest = escala uniforme, sem distorção)
+  'p11-hats':           { rows:[6], frames:[['hat-grad',46,29],['hat-crown',40,25],['hat-ribbon',31,19],['hat-viking',45,28],['hat-top',51,32],['hat-chef',54,34]] },
+  'p12-obstacles-ground':{ rows:[5], frames:[['obs-spike',57,22],['obs-barrier',44,39],['obs-stack',35,50],['obs-fence',51,34],['obs-hay',45,45]] },
+  'p13-obstacles-animals':{ rows:[6], frames:[['obs-fox-0',83,46],['obs-fox-1',71,39],['obs-falcon-0',76,27],['obs-falcon-1',95,34],['obs-owl-0',122,51],['obs-owl-1',94,39]] },
+  'p14-items-particles':{ rows:[9], frames:[['star',15,13],['feather-0',9,9],['feather-1',9,9],['petal-0',6,6],['petal-1',6,6],['leaf-0',8,8],['leaf-1',8,8],['flake-big',13,13],['flake-small',8,8]] },
+  'p16-sky':            { rows:[4], frames:[['cloud-big',20,12],['cloud-small',14,8],['sun',11,12],['moon',11,13]] },
   'p18-skills':         { rows:[5,5], frames:[
-      ['skill-nest-evolution',16,16],['skill-armor-feathers',16,16],['skill-double-sequence',16,16],
-      ['skill-elastic-jump',16,16],['skill-escape-reflex',16,16],['skill-blazing-hen',16,16],
-      ['skill-slide-blade',16,16],['skill-golden-hen',16,16],['skill-perfect-hunt',16,16],
-      ['skill-tail-turbo',16,16]] }
+      ['skill-nest-evolution',35,35],['skill-armor-feathers',36,36],['skill-double-sequence',36,36],
+      ['skill-elastic-jump',36,36],['skill-escape-reflex',35,35],['skill-blazing-hen',37,37],
+      ['skill-slide-blade',34,34],['skill-golden-hen',36,36],['skill-perfect-hunt',37,37],
+      ['skill-tail-turbo',36,36]] }
 };
 const RAW_KEYS = Object.keys(INVENTORY);
 const RAW_URL = k => 'raw-sprites/' + k + '.png.jpg';
@@ -384,13 +388,18 @@ function reprocess() {
     for (let r = 0; r < rows.length; r++) {
       const [ry0, ry1] = rows[r];
       const expect = spec.rows[r];
-      let det = detectCells(d, ry0, ry1, expect, opt.tol);
       let cells, splits = [];
-      if (!det) {
-        im.warnings.push('colunas linha ' + (r+1) + ': detecção falhou, corte igual');
-        cells = evenSplit(0, d.width, expect).map(c => ({ x0:c[0], x1:c[1], y0:ry0, y1:ry1 }));
+      if (spec.cells) {          // corte manual por folha (p08: detecção funde fall+duck)
+        cells = spec.cells.map(c => ({ x0:c[0], x1:c[1], y0:ry0, y1:ry1 }));
         splits = cells.slice(1).map(c => c.x0);
-      } else { cells = det.cells; splits = det.splits; }
+      } else {
+        const det = detectCells(d, ry0, ry1, expect, opt.tol);
+        if (!det) {
+          im.warnings.push('colunas linha ' + (r+1) + ': detecção falhou, corte igual');
+          cells = evenSplit(0, d.width, expect).map(c => ({ x0:c[0], x1:c[1], y0:ry0, y1:ry1 }));
+          splits = cells.slice(1).map(c => c.x0);
+        } else { cells = det.cells; splits = det.splits; }
+      }
       im.segs = (im.segs || []).concat(cells.map(c =>
         r + ':' + c.x0 + '-' + c.x1 + '/' + c.y0 + '-' + c.y1));
       // divisão artificial caiu em coluna com tinta → possível frame cortada

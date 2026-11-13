@@ -77,8 +77,9 @@ Frames marcadas com clique viram ❌ no REGENERATE.md.</footer>
 
 // ================= inventário (SPRITE-SHEET-PLAN.md §10) =================
 const INVENTORY = {
-  'p01-cluck-run-jump': { rows:[4], frames:[['cluck-run-0',16,22],['cluck-run-1',16,22],['cluck-jump-0',16,22],['cluck-jump-1',16,22]] },
-  'p02-cluck-poses':    { rows:[4], frames:[['cluck-fall',16,22],['cluck-duck',22,12],['cluck-peck',16,22],['cluck-dead',16,22]] },
+  // p01/p02: grade nativa do raw (bloco ~30px) — 1:1 sem downscale, densidade igual ao raw
+  'p01-cluck-run-jump': { rows:[4], frames:[['cluck-run-0',30,33],['cluck-run-1',29,33],['cluck-jump-0',28,32],['cluck-jump-1',27,32]] },
+  'p02-cluck-poses':    { rows:[4], frames:[['cluck-fall',35,41],['cluck-duck',39,26],['cluck-peck',33,40],['cluck-dead',34,32]] },
   'p03-rex-run-jump':   { rows:[4], frames:[['rex-run-0',16,22],['rex-run-1',16,22],['rex-jump-0',16,22],['rex-jump-1',16,22]] },
   'p04-rex-poses':      { rows:[4], frames:[['rex-fall',16,22],['rex-duck',22,12],['rex-peck',16,22],['rex-dead',16,22]] },
   'p05-chubby-run-jump':{ rows:[4], frames:[['chubby-run-0',16,22],['chubby-run-1',16,22],['chubby-jump-0',16,22],['chubby-jump-1',16,22]] },
@@ -473,13 +474,15 @@ function warningsCount() { return images.reduce((n, im) => n + im.warnings.lengt
 
 // ================= exportação =================
 function buildManifest() {
-  const m = { frameW:16, frameH:22, frames:{} };
+  const m = { frameW:0, frameH:0, frames:{} };
   for (const f of window.__frameList) {
     const fr = { x:f.x, y:f.y, w:f.w, h:f.h };
     // ink só quando a arte não ocupa a frame inteira (bbox da tinta)
     if (f.ink && (f.ink[0] || f.ink[1] || f.ink[2] !== f.w || f.ink[3] !== f.h))
       fr.ink = f.ink;
     m.frames[f.name] = fr;
+    m.frameW = Math.max(m.frameW, f.w);
+    m.frameH = Math.max(m.frameH, f.h);
   }
   return m;
 }

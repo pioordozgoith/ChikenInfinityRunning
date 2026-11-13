@@ -1,105 +1,69 @@
 window.SPRITE_MANIFEST = {
-  "frameW": 16,
-  "frameH": 22,
+  "frameW": 60,
+  "frameH": 51,
   "frames": {
     "cluck-run-0": {
       "x": 2,
       "y": 2,
-      "w": 16,
-      "h": 22,
-      "ink": [
-        0,
-        4,
-        16,
-        18
-      ]
+      "w": 30,
+      "h": 33
     },
     "cluck-run-1": {
-      "x": 20,
+      "x": 34,
       "y": 2,
-      "w": 16,
-      "h": 22,
+      "w": 29,
+      "h": 33,
       "ink": [
         0,
-        4,
-        16,
-        18
+        1,
+        29,
+        32
       ]
     },
     "cluck-jump-0": {
-      "x": 38,
+      "x": 65,
       "y": 2,
-      "w": 16,
-      "h": 22,
-      "ink": [
-        0,
-        4,
-        16,
-        18
-      ]
+      "w": 28,
+      "h": 32
     },
     "cluck-jump-1": {
-      "x": 56,
+      "x": 95,
       "y": 2,
-      "w": 16,
-      "h": 22,
-      "ink": [
-        0,
-        3,
-        16,
-        19
-      ]
+      "w": 27,
+      "h": 32
     },
     "cluck-fall": {
-      "x": 74,
+      "x": 124,
       "y": 2,
-      "w": 16,
-      "h": 22,
-      "ink": [
-        0,
-        3,
-        16,
-        19
-      ]
+      "w": 35,
+      "h": 41
     },
     "cluck-duck": {
-      "x": 92,
+      "x": 161,
       "y": 2,
-      "w": 22,
-      "h": 12,
-      "ink": [
-        2,
-        0,
-        18,
-        12
-      ]
+      "w": 39,
+      "h": 26
     },
     "cluck-peck": {
-      "x": 116,
+      "x": 202,
       "y": 2,
-      "w": 16,
-      "h": 22,
-      "ink": [
-        0,
-        3,
-        16,
-        19
-      ]
+      "w": 33,
+      "h": 40
     },
     "cluck-dead": {
-      "x": 134,
+      "x": 237,
       "y": 2,
-      "w": 16,
-      "h": 22,
+      "w": 34,
+      "h": 32,
       "ink": [
         0,
-        7,
-        16,
-        15
+        0,
+        33,
+        32
       ]
     },
     "rex-run-0": {
-      "x": 152,
+      "x": 273,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -111,7 +75,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-run-1": {
-      "x": 170,
+      "x": 291,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -123,7 +87,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-jump-0": {
-      "x": 188,
+      "x": 309,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -135,7 +99,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-jump-1": {
-      "x": 206,
+      "x": 327,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -147,7 +111,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-fall": {
-      "x": 224,
+      "x": 345,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -159,7 +123,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-duck": {
-      "x": 242,
+      "x": 363,
       "y": 2,
       "w": 22,
       "h": 12,
@@ -171,13 +135,13 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "rex-peck": {
-      "x": 266,
+      "x": 387,
       "y": 2,
       "w": 16,
       "h": 22
     },
     "rex-dead": {
-      "x": 284,
+      "x": 405,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -189,7 +153,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-run-0": {
-      "x": 302,
+      "x": 423,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -201,7 +165,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-run-1": {
-      "x": 320,
+      "x": 441,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -213,7 +177,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-jump-0": {
-      "x": 338,
+      "x": 459,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -225,7 +189,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-jump-1": {
-      "x": 356,
+      "x": 477,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -237,7 +201,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-fall": {
-      "x": 374,
+      "x": 495,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -249,7 +213,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-duck": {
-      "x": 392,
+      "x": 513,
       "y": 2,
       "w": 22,
       "h": 12,
@@ -261,7 +225,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-peck": {
-      "x": 416,
+      "x": 537,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -273,7 +237,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "chubby-dead": {
-      "x": 434,
+      "x": 555,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -285,7 +249,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-run-0": {
-      "x": 452,
+      "x": 573,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -297,7 +261,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-run-1": {
-      "x": 470,
+      "x": 591,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -309,7 +273,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-jump-0": {
-      "x": 488,
+      "x": 609,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -321,7 +285,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-jump-1": {
-      "x": 506,
+      "x": 627,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -333,7 +297,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-fall": {
-      "x": 524,
+      "x": 645,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -345,7 +309,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-duck": {
-      "x": 542,
+      "x": 663,
       "y": 2,
       "w": 22,
       "h": 12,
@@ -357,7 +321,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-peck": {
-      "x": 566,
+      "x": 687,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -369,7 +333,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "mecha-dead": {
-      "x": 584,
+      "x": 705,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -381,7 +345,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-run-0": {
-      "x": 602,
+      "x": 723,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -393,7 +357,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-run-1": {
-      "x": 620,
+      "x": 741,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -405,7 +369,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-jump-0": {
-      "x": 638,
+      "x": 759,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -417,7 +381,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-jump-1": {
-      "x": 656,
+      "x": 777,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -429,7 +393,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-fall": {
-      "x": 674,
+      "x": 795,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -441,7 +405,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-duck": {
-      "x": 692,
+      "x": 813,
       "y": 2,
       "w": 22,
       "h": 12,
@@ -453,7 +417,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-peck": {
-      "x": 716,
+      "x": 837,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -465,7 +429,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "shinobi-dead": {
-      "x": 734,
+      "x": 855,
       "y": 2,
       "w": 16,
       "h": 22,
@@ -477,7 +441,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-grad": {
-      "x": 752,
+      "x": 873,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -489,7 +453,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-crown": {
-      "x": 770,
+      "x": 891,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -501,7 +465,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-ribbon": {
-      "x": 788,
+      "x": 909,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -513,7 +477,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-viking": {
-      "x": 806,
+      "x": 927,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -525,7 +489,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-top": {
-      "x": 824,
+      "x": 945,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -537,7 +501,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "hat-chef": {
-      "x": 842,
+      "x": 963,
       "y": 2,
       "w": 16,
       "h": 10,
@@ -549,8 +513,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-spike": {
-      "x": 860,
-      "y": 2,
+      "x": 2,
+      "y": 45,
       "w": 54,
       "h": 21,
       "ink": [
@@ -561,8 +525,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-barrier": {
-      "x": 916,
-      "y": 2,
+      "x": 58,
+      "y": 45,
       "w": 48,
       "h": 42,
       "ink": [
@@ -573,8 +537,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-stack": {
-      "x": 966,
-      "y": 2,
+      "x": 108,
+      "y": 45,
       "w": 36,
       "h": 51,
       "ink": [
@@ -585,8 +549,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-fence": {
-      "x": 2,
-      "y": 55,
+      "x": 146,
+      "y": 45,
       "w": 54,
       "h": 36,
       "ink": [
@@ -597,8 +561,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-hay": {
-      "x": 58,
-      "y": 55,
+      "x": 202,
+      "y": 45,
       "w": 46,
       "h": 46,
       "ink": [
@@ -609,8 +573,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-fox-0": {
-      "x": 106,
-      "y": 55,
+      "x": 250,
+      "y": 45,
       "w": 58,
       "h": 32,
       "ink": [
@@ -621,8 +585,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-fox-1": {
-      "x": 166,
-      "y": 55,
+      "x": 310,
+      "y": 45,
       "w": 58,
       "h": 32,
       "ink": [
@@ -633,8 +597,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-falcon-0": {
-      "x": 226,
-      "y": 55,
+      "x": 370,
+      "y": 45,
       "w": 56,
       "h": 20,
       "ink": [
@@ -645,8 +609,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-falcon-1": {
-      "x": 284,
-      "y": 55,
+      "x": 428,
+      "y": 45,
       "w": 56,
       "h": 20,
       "ink": [
@@ -657,8 +621,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-owl-0": {
-      "x": 342,
-      "y": 55,
+      "x": 486,
+      "y": 45,
       "w": 48,
       "h": 20,
       "ink": [
@@ -669,8 +633,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "obs-owl-1": {
-      "x": 392,
-      "y": 55,
+      "x": 536,
+      "y": 45,
       "w": 48,
       "h": 20,
       "ink": [
@@ -681,8 +645,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "star": {
-      "x": 442,
-      "y": 55,
+      "x": 586,
+      "y": 45,
       "w": 7,
       "h": 6,
       "ink": [
@@ -693,8 +657,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "feather-0": {
-      "x": 451,
-      "y": 55,
+      "x": 595,
+      "y": 45,
       "w": 4,
       "h": 4,
       "ink": [
@@ -705,26 +669,26 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "feather-1": {
-      "x": 457,
-      "y": 55,
+      "x": 601,
+      "y": 45,
       "w": 4,
       "h": 4
     },
     "petal-0": {
-      "x": 463,
-      "y": 55,
+      "x": 607,
+      "y": 45,
       "w": 4,
       "h": 4
     },
     "petal-1": {
-      "x": 469,
-      "y": 55,
+      "x": 613,
+      "y": 45,
       "w": 4,
       "h": 4
     },
     "leaf-0": {
-      "x": 475,
-      "y": 55,
+      "x": 619,
+      "y": 45,
       "w": 3,
       "h": 3,
       "ink": [
@@ -735,14 +699,14 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "leaf-1": {
-      "x": 480,
-      "y": 55,
+      "x": 624,
+      "y": 45,
       "w": 3,
       "h": 3
     },
     "flake-big": {
-      "x": 485,
-      "y": 55,
+      "x": 629,
+      "y": 45,
       "w": 7,
       "h": 7,
       "ink": [
@@ -753,14 +717,14 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "flake-small": {
-      "x": 494,
-      "y": 55,
+      "x": 638,
+      "y": 45,
       "w": 5,
       "h": 5
     },
     "cloud-big": {
-      "x": 501,
-      "y": 55,
+      "x": 645,
+      "y": 45,
       "w": 60,
       "h": 36,
       "ink": [
@@ -771,8 +735,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "cloud-small": {
-      "x": 563,
-      "y": 55,
+      "x": 707,
+      "y": 45,
       "w": 40,
       "h": 24,
       "ink": [
@@ -783,8 +747,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "sun": {
-      "x": 605,
-      "y": 55,
+      "x": 749,
+      "y": 45,
       "w": 36,
       "h": 40,
       "ink": [
@@ -795,8 +759,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "moon": {
-      "x": 643,
-      "y": 55,
+      "x": 787,
+      "y": 45,
       "w": 30,
       "h": 36,
       "ink": [
@@ -807,8 +771,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-nest-evolution": {
-      "x": 675,
-      "y": 55,
+      "x": 819,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -819,8 +783,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-armor-feathers": {
-      "x": 693,
-      "y": 55,
+      "x": 837,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -831,8 +795,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-double-sequence": {
-      "x": 711,
-      "y": 55,
+      "x": 855,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -843,8 +807,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-elastic-jump": {
-      "x": 729,
-      "y": 55,
+      "x": 873,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -855,8 +819,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-escape-reflex": {
-      "x": 747,
-      "y": 55,
+      "x": 891,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -867,8 +831,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-blazing-hen": {
-      "x": 765,
-      "y": 55,
+      "x": 909,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -879,8 +843,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-slide-blade": {
-      "x": 783,
-      "y": 55,
+      "x": 927,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -891,8 +855,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-golden-hen": {
-      "x": 801,
-      "y": 55,
+      "x": 945,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [
@@ -903,14 +867,14 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-perfect-hunt": {
-      "x": 819,
-      "y": 55,
+      "x": 963,
+      "y": 45,
       "w": 16,
       "h": 16
     },
     "skill-tail-turbo": {
-      "x": 837,
-      "y": 55,
+      "x": 981,
+      "y": 45,
       "w": 16,
       "h": 16,
       "ink": [

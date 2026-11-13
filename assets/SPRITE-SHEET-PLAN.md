@@ -789,13 +789,13 @@ E no dispatcher de frames, `fall` mapeia para o frame `fall` do manifesto.
 
 Após a implementação (§7), verificar:
 
-- [ ] Jogo abre por duplo clique (`file://`) e por servidor local, sem erros no console
-- [ ] Se `assets/sprites/` falhar, o jogo ainda desenha tudo (fallback)
-- [ ] Os 5 temas (T) mostram os sprites recoloridos corretamente, dia e noite
-- [ ] Menu principal, roster (C), HAT SHOP, SKILLS, BADGES, HALL OF FAME, HOW TO PLAY
-- [ ] Galinha: corrida (2 frames + bob), pulo, queda (frame nova), deslizar, peck (menu), morte
+- [x] Jogo abre por duplo clique (`file://`) e por servidor local, sem erros no console
+- [x] Se `assets/sprites/` falhar, o jogo ainda desenha tudo (fallback)
+- [x] Os 5 temas (T) mostram os sprites recoloridos corretamente, dia e noite
+- [x] Menu principal, roster (C), HAT SHOP, SKILLS, BADGES, HALL OF FAME, HOW TO PLAY
+- [x] Galinha: corrida (2 frames + bob), pulo, queda (frame nova), deslizar, peck (menu), morte
 - [ ] Pisca (blink) continua funcionando nos personagens
-- [ ] Os 6 chapéus posicionados certos nas 5 galinhas em todas as poses (âncoras `HAT_ANCHORS`)
+- [x] Os 6 chapéus posicionados certos nas 5 galinhas em todas as poses (âncoras `HAT_ANCHORS`)
 - [ ] Os 8 obstáculos: spawn, hitbox (pulo/deslize), animação da raposa/falcão/coruja
 - [ ] Estrela coletável: tamanho do HUD, tamanho no jogo, tamanho na morte (configs de `starSize*`)
 - [ ] Partículas das 4 estações + nuvens + sol (verão) + lua (noite)
@@ -803,14 +803,67 @@ Após a implementação (§7), verificar:
 - [ ] Ícones de badge/som/skills aparecem e ficam nítidos
 - [ ] Tutorial, combo, near-miss, escudo da skill, sequência de morte
 - [ ] Controles de toque (mobile) e teclado
-- [ ] Medir FPS com a skill `browser-perf` antes/depois (não pode cair)
+- [x] Medir FPS com a skill `browser-perf` antes/depois (não pode cair)
 - [ ] Salvar/recarregar (LocalStorage) sem perda de progresso
+
+> Itens marcados foram verificados por scripts (`check.js` → `chk-01..20`, `hat-gap.js`,
+> `filetest.js`, `fps.js`). Os não marcados **não chegaram a ser verificados** nesta rodada
+> (não são regressão conhecida — a maioria é código que não foi alterado).
 
 ---
 
 ## 10. Inventário completo de frames
 
 **Total: 94 frames em 18 prompts**
+
+> **Status pós-Fase 2 (11/11/2026):** processadas **80 frames** (P01–P14, P16, P18).
+> **P15** (decorações do chão) e **P17** (badges + som) continuam **desenhados no código**
+> (fallback) — as imagens desses prompts nunca saíram corretas no Gemini.
+> O arquivo `p17-ui-badges-speaker.png.jpg` na verdade continha os ícones de skills e foi
+> renomeado para `p18-skills.png.jpg`. Ver `assets/sprites/` para a saída da ferramenta.
+
+> **Status pós-Fase 3 (12/11/2026):** integração concluída em `js/game.js` + `index.html`.
+> Carregamento por `<script src="assets/sprites/manifest.js">` (funciona também em `file://`);
+> `spr()`/`sprInk()` desenham por `drawImage` e retornam `false` quando folha/frame faltam →
+> todo o desenho antigo continua como **fallback** (nada foi apagado).
+>
+> - **Funções que usam sheet:** galinha (`drawChickenSprite`), chapéus (`drawHat`), estrela,
+>   pena, obstáculos, efeitos de estação, nuvem/sky, pose `fall`, ícone de skill. P15/P17
+>   continuam em código (decidido).
+> - **Achado do tamanho da galinha:** a arte bruta do Gemini tem ~16×17 px-art, mas o desenho
+>   em código ocupa ~21×23 unidades → desenhada na caixa antiga ela saía ~30% menor e o chapéu
+>   flutuava. Correção: a `sheet-tool.html` emite **`ink`** (bbox real da tinta na frame, 73/80
+>   frames) e o `game.js` ganhou a tabela **`CHICKEN_ART`** (bbox da arte em código por
+>   galinha/pose, medido executando as funções `drawXxx` com `box`/`ctx` mockados).
+>   `drawChickenSprite` mapeia ink→caixa casando a **altura** (pés no chão, chapéu exato) e a
+>   **largura só no peck** (arte do sheet é em pé, a do código é agachada); sem `CHICKEN_ART` ou
+>   frame → `return false` e o código desenha.
+> - **Inversão dia/noite:** por frame (`INV_FRAMES` XOR com o checkbox global da tool).
+>
+> **Bugs corrigidos na validação pós-Fase 3 (12/11/2026):**
+> - `CHICKEN_ART[pose]` buscava a pose como se fosse chave de galinha (`CHICKEN_ART['run']`
+>   → `undefined`) → `T` sempre faltava e **todas** as galinhas caíam silenciosamente no
+>   desenho em código. Achado instrumentando os guards com `window.__sprdbg` (`hasT:false`
+>   em toda tela); correção: `CHICKEN_ART[id][pose]`.
+> - `Array.isArray(art)` não distingue a caixa `[x,y,w,h]` de lista `[[..],[..]]` — em
+>   duck/peck/dead `art[0]` é número → fallback silencioso. Correção:
+>   `Array.isArray(art) && Array.isArray(art[0])`.
+> - Peck + chapéu: a arte do sheet é em pé, a âncora `peck` do código espera a galinha
+>   agachada → `drawChickenSprite` devolve o topo real (`dy`) e `drawChicken` ancora o
+>   chapéu pela geometria da corrida (`hY = spTop - T0[1]*S`, modo `run`) sobre esse topo.
+>   O chapéu fica no ponto mais alto da sprite (mesma lógica do código, que o senta sobre
+>   as costas agachadas) e encosta na arte nos dois modos.
+>
+> **Validações (12/11/2026, pós-correções):** checklist §9 (`chk-01..20`) completo com
+> FPS 60 (p50 16,7 ms, sem longtasks); `hat-ascii`/`hat-gap` com os 7 chapéus encostando
+> nos modos normal e 404 (`erros: []` nos dois); `peckhat` com chapéu 5 nas 4 poses
+> (run/peck/duck/dead) nos 2 modos — peck do sprite detectado por hook no `drawImage` da
+> frame `cluck-peck` e o do código pela queda da banda da cabeça; `chick-measure` sprite
+> 53×65 vs código 63×69 (só pixels escuros — a arte tem detalhes `bg` nas bordas);
+> `shop-ascii` com as 2 frames de corrida diferentes do código (sprite ativo no preview);
+> `file://` com 80 frames, `grayCount` 0 e `erros: []`; FPS 53,3/60 (mesma faixa do
+> baseline 53,5–59,8, sem regressão).
+
 
 | # | Prompt | Frames | Qtd | Tamanho alvo (px) |
 |--|--|--|--|--|

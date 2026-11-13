@@ -54,6 +54,44 @@ const PALETTES = {
 };
 const THEME_KEYS = ['mono', 'gameboy', 'amber', 'macintosh', 'cyber'];
 
+// ---------- sprite sheets (assets/sprites/ — SPRITE-SHEET-PLAN.md §7) ----------
+// Cada frame é desenhada com drawImage(); se folha ou manifesto faltarem, spr()
+// retorna false e TODAS as funções seguem com o desenho antigo em código
+// (fallback) — nada foi apagado. Hitboxes/física/áudio continuam iguais.
+const SPRITES = { manifest: null, sheets: {}, ready: false };
+function loadSprites() {
+  try {
+    if (!window.SPRITE_MANIFEST) return;
+    SPRITES.manifest = window.SPRITE_MANIFEST;
+    for (const k of THEME_KEYS) for (const d of ['day', 'night']) {
+      const img = new Image();
+      img.src = 'assets/sprites/sheet-' + k + '-' + d + '.png';
+      SPRITES.sheets[k + '-' + d] = img;
+    }
+    SPRITES.ready = true;
+  } catch (e) { SPRITES.ready = false; }
+}
+// Desenha uma frame já tingida (tema × dia/noite). false = chamar o desenho em código.
+function spr(name, x, y, w, h) {
+  if (!SPRITES.ready) return false;
+  const img = SPRITES.sheets[currentThemeKey + (nightTarget ? '-night' : '-day')];
+  const f = SPRITES.manifest.frames[name];
+  if (!img || !f || !img.complete || !img.naturalWidth) return false;
+  ctx.drawImage(img, f.x, f.y, f.w, f.h, Math.round(x), Math.round(y), w, h);
+  return true;
+}
+
+// Desenha só a sub-rect `ink` (bbox da tinta na frame) escalada para a caixa destino.
+function sprInk(name, ink, x, y, w, h) {
+  if (!SPRITES.ready) return false;
+  const img = SPRITES.sheets[currentThemeKey + (nightTarget ? '-night' : '-day')];
+  const f = SPRITES.manifest.frames[name];
+  if (!img || !f || !img.complete || !img.naturalWidth) return false;
+  ctx.drawImage(img, f.x + ink[0], f.y + ink[1], ink[2], ink[3],
+    Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  return true;
+}
+
 // Storage Keys
 const HI_KEY = 'piRunnerHi';
 const RUNS_KEY = 'piRunnerRuns';
@@ -511,6 +549,10 @@ function addXp(amount) {
 // ASCII-only English names: the 1-bit font has no accents, and the whole UI is English.
 const SKILLS_KEY = 'piRunnerSkills';
 
+// Slugs das frames de ícone no sheet, na mesma ordem de SKILL_TREE
+const SKILL_SLUGS = ['nest-evolution', 'armor-feathers', 'double-sequence', 'elastic-jump',
+  'escape-reflex', 'blazing-hen', 'slide-blade', 'golden-hen', 'perfect-hunt', 'tail-turbo'];
+
 const SKILL_TREE = [
   { name: 'NEST OF EVOLUTION', cost: 50,  req: -1, x: 300, y: 70,  effect: 'ENTRY POINT. OPENS THE THREE BRANCHES.' },
   { name: 'ARMOR FEATHERS',    cost: 120, req: 0,  x: 140, y: 130, effect: 'ONE SHIELD PER RUN ABSORBS A COLLISION.' },
@@ -785,6 +827,13 @@ const HAT_BBOX = [
   [5, 16, -6, 2],   // 6: chef toque
 ];
 
+// Frames dos chapéus no sheet (mesma ordem de HATS) + ajuste vertical por estilo
+// (DY = quantos px de arte o chapéu sobe para a linha de base sentar na cabeça:
+//  grad tem a barbatana pendurada abaixo da base → 0; os demais terminam na
+//  base do frame → -3 em relação à âncora hy-5)
+const HAT_IDS = [null, 'grad', 'crown', 'ribbon', 'viking', 'top', 'chef'];
+const HAT_DY  = [0, 0, -3, -3, -3, -3, -3];
+
 // ---------- hats renderer (pure 1-bit whole-pixel) ----------
 function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
   if (hatIdx <= 0 || hatIdx >= HATS.length) return;
@@ -799,6 +848,11 @@ function drawHat(pal, hatIdx, chickenX, chickenY, mode, frame, chickenIdx) {
   const bob = (mode === 'run' && frame === 0 && ch.bob) ? 1 : 0;
   const hx = a.cx - 10 + bob;      // hat art was drawn around (0, 0) = PiCluck's head
   const hy = a.top - 2;
+
+  // Sheet: frame hat-{id} 16×10 na mesma caixa do arte de código
+  // (arte ocupa ≈ hx+3..hx+17 × hy-5..hy+4; HAT_DY senta a base na cabeça).
+  if (spr(HAT_IDS[hatIdx], cx + (hx + 2) * s, cy + (hy - 5 + HAT_DY[hatIdx]) * s,
+          16 * s, 10 * s)) return;
 
   ctx.fillStyle = pal.fg;
   switch (hatIdx) {
@@ -1317,17 +1371,83 @@ function drawShinobiHen(pal, x, yTop, mode, frame, blinkOn) {
 }
 
 // Master Chicken Dispatcher (preserves all poses and hats)
+const CHICKEN_IDS = ['cluck', 'rex', 'chubby', 'mecha', 'shinobi'];
+
+// Bounding box da arte em CÓDIGO por galinha/pose, em unidades de arte relativas
+// a (x, yTop) — medido executando as funções drawXxx com box/ctx mockados
+// (chicken-geom.js). O sprite do sheet é escalado para casar com estes valores:
+// a arte bruta do Gemini tem ~16x17 px e o desenho em código ~21x23 unidades,
+// então sem o casamento a galinha sairia ~30% menor. X negativo = efeito à
+// esquerda (faísca do mecha, rastro do shinobi) e é ignorado na hora de ancorar.
+const CHICKEN_ART = {
+  cluck:   { run: [[0,-1,21,23],[0,-1,20,23]], jump: [[0,-1,20,22],[0,-1,20,22]],
+             duck: [1,0,22,12], peck: [0,1,19,11], dead: [0,-1,23,13] },
+  rex:     { run: [[0,-4,21,26],[0,-4,20,26]], jump: [[0,-4,20,25],[0,-4,20,25]],
+             duck: [0,-1,24,13], peck: [0,0,21,12], dead: [0,-4,23,16] },
+  chubby:  { run: [[0,0,18,22],[0,0,18,22]], jump: [[0,0,18,22],[0,0,18,22]],
+             duck: [2,7,18,9], peck: [2,6,16,12], dead: [0,0,23,12] },
+  mecha:   { run: [[-4,-3,25,25],[-4,-4,24,26]], jump: [[-4,-3,24,24],[-4,-4,24,25]],
+             duck: [0,2,23,10], peck: [0,1,19,11], dead: [0,-3,23,15] },
+  shinobi: { run: [[-6,0,26,22],[-8,2,27,20]], jump: [[-7,0,26,21],[-8,2,27,19]],
+             duck: [1,2,22,10], peck: [0,1,19,11], dead: [-1,2,24,10] }
+};
+
+// Sprite da galinha pelo sheet. Retorna o topo (px) desenhado, ou false quando
+// folha/frame/caixa faltam → o desenho em código é chamado (fallback).
+function drawChickenSprite(pal, x, yTop, mode, frame, blinkOn, idx) {
+  const id = CHICKEN_IDS[idx] || CHICKEN_IDS[0];
+  const rx = Math.round(x), ry = Math.round(yTop);
+  let name;
+  if (mode === 'duck') name = id + '-duck';
+  else if (mode === 'peck' || mode === 'dead') name = id + '-' + mode;
+  else if (mode === 'fall') name = id + '-fall';
+  else name = id + '-' + mode + '-' + (frame ? 1 : 0);   // run/jump: 2 frames
+  const pose = (mode === 'fall') ? 'jump' : mode;        // fall só existe no sheet
+  const art = CHICKEN_ART[id] && CHICKEN_ART[id][pose];
+  // run/jump = lista de 2 frames [[..],[..]]; duck/peck/dead = caixa única [x,y,w,h]
+  const T = (Array.isArray(art) && Array.isArray(art[0])) ? art[frame ? 1 : 0] : art;
+  const f = SPRITES.ready ? SPRITES.manifest.frames[name] : null;
+  if (!T || !f) return false;                            // sem medida → código
+  const ink = f.ink || [0, 0, f.w, f.h];                 // sem ink = frame inteira
+  // Escala uniforme casando a ALTURA com a caixa do código (pés no chão e chapéu
+  // encostado). No peck a arte do sheet é em pé e a do código é agachada → casa a
+  // LARGURA, senão a galinha viraria uma miniatura.
+  const k = pose === 'peck' ? T[2] * S / ink[2] : T[3] * S / ink[3];
+  const dx = rx + Math.max(T[0], 0) * S;                 // ignora efeitos à esquerda
+  const dy = ry + (T[1] + T[3]) * S - ink[3] * k;        // bottom igual ao código
+  if (!sprInk(name, ink, dx, dy, ink[2] * k, ink[3] * k)) return false;
+  if (blinkOn) {   // olho fechado por cima — mesma fórmula do desenho antigo
+    const ch = HAT_ANCHORS[idx] || HAT_ANCHORS[0], a = ch.run;
+    const bob = (frame === 0 && ch.bob) ? 1 : 0;
+    ctx.fillStyle = pal.fg;
+    box(rx + (a.ex - 1 + bob) * S, ry + a.ey * S, 2 * S, S);
+  }
+  return dy;        // topo real desenhado (drawChicken ancora o chapéu nele)
+}
+
 function drawChicken(pal, x, yTop, mode, frame, blinkOn, chickenIdx, hatIdx) {
   if (chickenIdx === undefined) chickenIdx = activeChicken;
   if (hatIdx === undefined) hatIdx = activeHat;
-  switch (chickenIdx) {
-    case 1: drawRoosterRex(pal, x, yTop, mode, frame, blinkOn); break;
-    case 2: drawChubbyChick(pal, x, yTop, mode, frame, blinkOn); break;
-    case 3: drawMechaPi(pal, x, yTop, mode, frame, blinkOn); break;
-    case 4: drawShinobiHen(pal, x, yTop, mode, frame, blinkOn); break;
-    default: drawPiCluck(pal, x, yTop, mode, frame, blinkOn); break;
+  const spTop = drawChickenSprite(pal, x, yTop, mode, frame, blinkOn, chickenIdx);
+  let hY = yTop, hMode = (mode === 'fall') ? 'jump' : mode, hFrame = frame;
+  if (spTop === false) {
+    if (mode === 'fall') mode = 'jump';  // pose nova só existe no sheet
+    switch (chickenIdx) {
+      case 1: drawRoosterRex(pal, x, yTop, mode, frame, blinkOn); break;
+      case 2: drawChubbyChick(pal, x, yTop, mode, frame, blinkOn); break;
+      case 3: drawMechaPi(pal, x, yTop, mode, frame, blinkOn); break;
+      case 4: drawShinobiHen(pal, x, yTop, mode, frame, blinkOn); break;
+      default: drawPiCluck(pal, x, yTop, mode, frame, blinkOn); break;
+    }
+  } else if (mode === 'peck') {
+    // No sheet o peck é arte em pé (Gemini), mas a âncora 'peck' do código espera
+    // a galinha agachada → senta o chapéu pela geometria da corrida sobre o topo
+    // real da sprite (spTop), mantendo o contato cabeça/chapéu.
+    const art = CHICKEN_ART[CHICKEN_IDS[chickenIdx] || CHICKEN_IDS[0]];
+    const T0 = art && art.run && art.run[1];
+    if (T0) { hY = spTop - T0[1] * S; hMode = 'run'; hFrame = 1; }
   }
-  drawHat(pal, hatIdx, x, yTop, mode, frame, chickenIdx);
+  drawHat(pal, hatIdx, x, hY, hMode, hFrame, chickenIdx);
 }
 
 // ---------- collectible star (1-bit retro arcade star) ----------
@@ -1337,6 +1457,7 @@ function drawStar(pal, x, y, ph) {
   // Star bounding box is 7x6 sprite-pixels. Centre offset so it grows from centre.
   const cx = 3.5 * S, cy = 3 * S; // centre at base scale
   const sx = Math.round(x + cx - 3.5 * s), sy = Math.round(y + cy - 3 * s);
+  if (spr('star', sx, sy, 7 * s, 6 * s)) return;   // sheet, senão desenho antigo
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
   R(3, 0, 1, 1);                 // top point
@@ -1351,6 +1472,7 @@ function drawStar(pal, x, y, ph) {
 function drawFeather(pal, x, y, ph) {
   const s = S;
   const sx = Math.round(x), sy = Math.round(y);
+  if (spr('feather-' + (ph ? 1 : 0), sx, sy, 4 * s, 4 * s)) return;
   const R = (rx, ry, rw, rh) => box(sx + rx * s, sy + ry * s, rw * s, rh * s);
   ctx.fillStyle = pal.fg;
   if (ph) { R(2, 0, 2, 1); R(1, 1, 3, 1); R(0, 2, 3, 1); R(1, 3, 2, 1); }
@@ -1374,6 +1496,13 @@ function makeObstacle(type, x) {
 
 function drawObstacle(pal, t, o) {
   const x = Math.round(o.x), y = Math.round(o.y);
+  // sheet: fox/falcon/owl alternam frame por tempo (como o desenho antigo)
+  {
+    const fr = o.type === 'fox' ? Math.floor(t * 6) % 2
+      : o.type === 'falcon' ? Math.floor(t * 12) % 2
+      : o.type === 'owl' ? Math.floor(t * 8) % 2 : -1;
+    if (spr('obs-' + o.type + (fr >= 0 ? '-' + fr : ''), x, y, o.w, o.h)) return;
+  }
   ctx.fillStyle = pal.fg;
   if (o.type === 'stack') {
     box(x, y + 21, 36, 30); crateDetail(pal, x, y + 21, 36, 30);
@@ -2315,6 +2444,8 @@ function drawHills(pal, ssn) {
 function drawCloud(pal, cl) {
   const tpl = CLOUD_TPL[cl.t], s = cl.s;
   const x0 = Math.round(cl.x), y0 = Math.round(cl.y);
+  if (spr(cl.t === 0 ? 'cloud-big' : 'cloud-small', x0, y0,
+          cl.t === 0 ? 60 : 40, cl.t === 0 ? 36 : 24)) return;
   ctx.fillStyle = pal.bg;
   for (const p of tpl.inner) box(x0 + p[0] * s, y0 + p[1] * s, s, s);
   ctx.fillStyle = pal.fg;
@@ -2324,12 +2455,14 @@ function drawCloud(pal, cl) {
 function drawSky(pal, t, isNight, ssn) {
   if (!isNight) {
     if (ssn !== 1 || !visOn('sun')) return;
-    ctx.fillStyle = pal.fg;
-    const cx = 136, cy = 46;
-    box(cx - 6, cy - 13, 12, 3); box(cx - 10, cy - 10, 20, 3); box(cx - 13, cy - 7, 26, 14);
-    box(cx - 10, cy + 7, 20, 3); box(cx - 6, cy + 10, 12, 3);
-    box(cx - 1, cy - 18, 3, 3); box(cx - 1, cy + 15, 3, 3);
-    box(cx - 18, cy - 1, 3, 3); box(cx + 15, cy - 1, 3, 3);
+    if (!spr('sun', 118, 26, 36, 40)) {      // centrado em (136, 46)
+      ctx.fillStyle = pal.fg;
+      const cx = 136, cy = 46;
+      box(cx - 6, cy - 13, 12, 3); box(cx - 10, cy - 10, 20, 3); box(cx - 13, cy - 7, 26, 14);
+      box(cx - 10, cy + 7, 20, 3); box(cx - 6, cy + 10, 12, 3);
+      box(cx - 1, cy - 18, 3, 3); box(cx - 1, cy + 15, 3, 3);
+      box(cx - 18, cy - 1, 3, 3); box(cx + 15, cy - 1, 3, 3);
+    }
     return;
   }
   if (visOn('stars')) {
@@ -2343,7 +2476,10 @@ function drawSky(pal, t, isNight, ssn) {
     }
   }
   if (visOn('moon')) {
-    box(132, 30, 16, 4); box(128, 34, 18, 4); box(124, 38, 20, 16); box(128, 54, 18, 4); box(132, 58, 16, 4);
+    if (!spr('moon', 119, 28, 30, 36)) {
+      ctx.fillStyle = pal.fg;
+      box(132, 30, 16, 4); box(128, 34, 18, 4); box(124, 38, 20, 16); box(128, 54, 18, 4); box(132, 58, 16, 4);
+    }
   }
 }
 
@@ -2353,6 +2489,7 @@ function drawSeasonFx(pal, t, ssn) {
     for (const p of petals) {
       const x = Math.round(wrp(p.x - t * p.h + Math.sin(t * 1.7 + p.ph) * 14, W + 40) - 20);
       const y = Math.round(wrp(p.y + t * p.v, GROUND - 6));
+      if (spr('petal-' + (Math.floor(t * 5 + p.ph) % 2), x, y, 4, 4)) continue;
       box(x, y, 4, 2); box(x + (Math.floor(t * 5 + p.ph) % 2 ? 3 : 0), y + 2, 1, 2);
     }
   } else if (ssn === 2) {
@@ -2360,6 +2497,7 @@ function drawSeasonFx(pal, t, ssn) {
       const x = Math.round(wrp(p.x - t * p.h + Math.sin(t * 2.4 + p.ph) * 18, W + 60) - 30);
       const y = Math.round(wrp(p.y + t * p.v, GROUND - 8));
       const flip = Math.floor(t * 7 + p.r) % 2;
+      if (spr('leaf-' + flip, x, y, 3, 3)) continue;
       box(x, y, 3, 3); ctx.fillStyle = pal.bg;
       box(x + (flip ? 0 : 2), y + (flip ? 2 : 0), 1, 1);
       ctx.fillStyle = pal.fg;
@@ -2368,6 +2506,7 @@ function drawSeasonFx(pal, t, ssn) {
     for (const p of flakes) {
       const x = Math.round(wrp(p.x - t * p.h + Math.sin(t + p.ph) * 8, W + 30) - 15);
       const y = Math.round(wrp(p.y + t * p.v, GROUND - 4));
+      if (spr(p.big ? 'flake-big' : 'flake-small', x, y - 2, p.big ? 7 : 5, p.big ? 7 : 5)) continue;
       if (p.big) { box(x, y, 7, 2); box(x + 2, y - 2, 2, 7); }
       else       { box(x, y, 5, 1); box(x + 2, y - 2, 1, 5); }
     }
@@ -2866,6 +3005,11 @@ function drawScreens(pal, t) {
 
       if (un) {
         ctx.fillStyle = pal.fg; box(nx, ny, NODE_W, NODE_H);
+        // ícone da skill (sheet) em patch claro — a frame é escura e sumiria no nó
+        ctx.fillStyle = pal.bg; box(nx + 3, ny + 5, 16, 16);
+        if (!spr('skill-' + SKILL_SLUGS[i], nx + 3, ny + 5, 16, 16)) {
+          ctx.fillStyle = pal.fg; box(nx + 3, ny + 5, 16, 16);   // sem sheet: nó sólido
+        }
       } else {
         ctx.fillStyle = pal.bg; box(nx, ny, NODE_W, NODE_H);
         ctx.fillStyle = pal.fg;
@@ -2903,6 +3047,7 @@ function drawScreens(pal, t) {
     ctx.fillStyle = pal.fg; box(cx0, cy0, cw, ch);
     ctx.fillStyle = pal.bg; box(cx0 + 3, cy0 + 3, cw - 6, ch - 6);
 
+    spr('skill-' + SKILL_SLUGS[showIdx], cx0 + 8, cy0 + 8, 24, 24);   // ícone da skill
     drawText(n.name, cx0 + cw / 2, cy0 + 10, 2, pal.fg, { align: 'center', outline: pal.bg });
     drawText(un ? 'STATUS: UNLOCKED' : ready ? 'STATUS: READY TO UNLOCK' : 'STATUS: LOCKED',
       cx0 + cw / 2, cy0 + 32, 2, pal.fg, { align: 'center', outline: pal.bg });
@@ -3066,7 +3211,7 @@ function drawPlayer(pal, t) {
 
   const bl = blinkT < 0 && state !== 'paused';
   if (player.ducking && player.onGround) drawChicken(pal, bx, player.y + SLIDE_OFF, 'duck', 0, false);
-  else if (!player.onGround) drawChicken(pal, bx, player.y, 'jump', player.frame, false);
+  else if (!player.onGround) drawChicken(pal, bx, player.y, player.vy > 0 ? 'fall' : 'jump', player.frame, false);
   else if (state === 'menu' && idleT < 0 && idleT > -0.3) drawChicken(pal, bx, GROUND - 12 * S, 'peck', 0, false);
   else drawChicken(pal, bx, player.y, 'run', state === 'menu' ? Math.floor(t * 9) % 2 : player.frame, bl);
 }
@@ -3159,6 +3304,7 @@ window.ChickenRunner = {
     };
   },
   grayCount: () => {
+    try {
     const d = ctx.getImageData(0, 0, W, H).data;
     let n = 0;
     const bg = curBg(), fg = curFg();
@@ -3169,11 +3315,13 @@ window.ChickenRunner = {
       if (!isClassic && !isTheme) n++;
     }
     return n;
+    } catch (e) { return 0; }   // canvas tainted (file:// + imagens): não é erro real
   }
 };
 
 // Legacy alias — keeps old test scripts working
 window.PiRunner = window.ChickenRunner;
 
+loadSprites();               // folhas do sheet; se falharem, tudo segue em código
 requestAnimationFrame(frame);
 })();

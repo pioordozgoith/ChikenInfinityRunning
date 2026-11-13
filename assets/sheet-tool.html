@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheet Tool — 1-bit sprite post-processing</title>
+<style>
+  :root { --bg:#111; --panel:#1b1b1f; --line:#333; --fg:#e8e8e8; --acc:#ff00ff; --ok:#5f5; --warn:#fa5; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 Consolas, Menlo, monospace; }
+  header { padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line);
+           display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; letter-spacing:1px; }
+  header .hint { opacity:.6; font-size:12px; }
+  .controls { display:flex; gap:18px; align-items:center; padding:8px 16px; background:var(--panel);
+              border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .controls label { display:flex; gap:6px; align-items:center; font-size:12px; }
+  .controls input[type=range] { width:110px; }
+  button { background:#2b2b31; color:var(--fg); border:1px solid #444; padding:5px 12px;
+           font:12px Consolas, monospace; cursor:pointer; }
+  button:hover { background:#3a3a42; }
+  button.primary { background:#5a1f5a; border-color:#a3f; }
+  #drop { margin:14px 16px; border:2px dashed #555; border-radius:6px; padding:18px; text-align:center; }
+  #drop.hot { border-color:var(--acc); color:var(--acc); }
+  #cards { padding:0 16px 40px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+          margin:12px 0; padding:10px 12px; }
+  .card h2 { font-size:13px; margin:0 0 6px; display:flex; gap:12px; align-items:center; }
+  .card .warn { color:var(--warn); }
+  .card .ok { color:var(--ok); }
+  .row { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+  .orig { max-width:340px; }
+  .orig canvas { max-width:340px; height:auto; image-rendering:pixelated;
+                 background:repeating-conic-gradient(#222 0 25%, #2a2a2a 0 50%) 0 0/16px 16px; }
+  .strip { display:flex; gap:8px; flex-wrap:wrap; flex:1; min-width:300px; }
+  .frame { text-align:center; font-size:10px; color:#999; cursor:pointer; position:relative; }
+  .frame canvas { display:block; image-rendering:pixelated;
+                  background:repeating-conic-gradient(#222 0 25%, #2a2a2a 0 50%) 0 0/8px 8px;
+                  border:1px solid #333; }
+  .frame.bad canvas { border-color:var(--warn); }
+  .frame.bad::after { content:"X"; position:absolute; top:0; left:0; right:0; bottom:14px;
+                      display:flex; align-items:center; justify-content:center;
+                      color:var(--warn); font-size:34px; font-weight:bold;
+                      text-shadow:0 0 4px #000; pointer-events:none; }
+  .opts { font-size:11px; color:#888; display:flex; gap:14px; margin-top:6px; align-items:center; }
+  footer { padding:8px 16px; color:#777; font-size:11px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1>SHEET TOOL</h1>
+  <span class="hint">magenta &rarr; transparente &middot; quantiza 2 cores &middot; nearest-neighbor &middot; folha + manifesto + 10 tintes</span>
+  <span id="status" class="hint">pronto</span>
+</header>
+
+<div class="controls">
+  <label>limiar <input type="range" id="thr" min="40" max="220" value="128"><span id="thrV">128</span></label>
+  <label>tol. magenta <input type="range" id="tol" min="30" max="300" value="150"><span id="tolV">150</span></label>
+  <label><input type="checkbox" id="invert"> inverter preto/branco (global)</label>
+  <button id="btnAuto" class="primary">carregar raw-sprites/ (16)</button>
+  <button id="btnFiles">escolher arquivos&hellip;</button>
+  <button id="btnExport" class="primary">exportar tudo</button>
+  <span id="summary" class="hint"></span>
+</div>
+
+<div id="drop">arraste os PNGs de <b>assets/raw-sprites/</b> aqui<br>
+  <span class="hint">(duplo clique no arquivo funciona: use "escolher arquivos"; "carregar raw-sprites/" precisa de servidor local)</span>
+</div>
+<input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+
+<div id="cards"></div>
+
+<footer>O resultado vai para <b>assets/sprites/</b> (sheet-master.png, manifest.json, manifest.js, 10 folhas tingidas).
+Frames marcadas com clique viram ❌ no REGENERATE.md.</footer>
+
+<script>
+"use strict";
+
+// ================= inventário (SPRITE-SHEET-PLAN.md §10) =================
+const INVENTORY = {
+  'p01-cluck-run-jump': { rows:[4], frames:[['cluck-run-0',16,22],['cluck-run-1',16,22],['cluck-jump-0',16,22],['cluck-jump-1',16,22]] },
+  'p02-cluck-poses':    { rows:[4], frames:[['cluck-fall',16,22],['cluck-duck',22,12],['cluck-peck',16,22],['cluck-dead',16,22]] },
+  'p03-rex-run-jump':   { rows:[4], frames:[['rex-run-0',16,22],['rex-run-1',16,22],['rex-jump-0',16,22],['rex-jump-1',16,22]] },
+  'p04-rex-poses':      { rows:[4], frames:[['rex-fall',16,22],['rex-duck',22,12],['rex-peck',16,22],['rex-dead',16,22]] },
+  'p05-chubby-run-jump':{ rows:[4], frames:[['chubby-run-0',16,22],['chubby-run-1',16,22],['chubby-jump-0',16,22],['chubby-jump-1',16,22]] },
+  'p06-chubby-poses':   { rows:[4], frames:[['chubby-fall',16,22],['chubby-duck',22,12],['chubby-peck',16,22],['chubby-dead',16,22]] },
+  'p07-mecha-run-jump': { rows:[4], frames:[['mecha-run-0',16,22],['mecha-run-1',16,22],['mecha-jump-0',16,22],['mecha-jump-1',16,22]] },
+  'p08-mecha-poses':    { rows:[4], frames:[['mecha-fall',16,22],['mecha-duck',22,12],['mecha-peck',16,22],['mecha-dead',16,22]] },
+  'p09-shinobi-run-jump':{ rows:[4], frames:[['shinobi-run-0',16,22],['shinobi-run-1',16,22],['shinobi-jump-0',16,22],['shinobi-jump-1',16,22]] },
+  'p10-shinobi-poses':  { rows:[4], frames:[['shinobi-fall',16,22],['shinobi-duck',22,12],['shinobi-peck',16,22],['shinobi-dead',16,22]] },
+  'p11-hats':           { rows:[6], frames:[['hat-grad',16,10],['hat-crown',16,10],['hat-ribbon',16,10],['hat-viking',16,10],['hat-top',16,10],['hat-chef',16,10]] },
+  'p12-obstacles-ground':{ rows:[5], frames:[['obs-spike',54,21],['obs-barrier',48,42],['obs-stack',36,51],['obs-fence',54,36],['obs-hay',46,46]] },
+  'p13-obstacles-animals':{ rows:[6], frames:[['obs-fox-0',58,32],['obs-fox-1',58,32],['obs-falcon-0',56,20],['obs-falcon-1',56,20],['obs-owl-0',48,20],['obs-owl-1',48,20]] },
+  'p14-items-particles':{ rows:[9], frames:[['star',7,6],['feather-0',4,4],['feather-1',4,4],['petal-0',4,4],['petal-1',4,4],['leaf-0',3,3],['leaf-1',3,3],['flake-big',7,7],['flake-small',5,5]] },
+  'p16-sky':            { rows:[4], frames:[['cloud-big',60,36],['cloud-small',40,24],['sun',36,40],['moon',30,36]] },
+  'p18-skills':         { rows:[5,5], frames:[
+      ['skill-nest-evolution',16,16],['skill-armor-feathers',16,16],['skill-double-sequence',16,16],
+      ['skill-elastic-jump',16,16],['skill-escape-reflex',16,16],['skill-blazing-hen',16,16],
+      ['skill-slide-blade',16,16],['skill-golden-hen',16,16],['skill-perfect-hunt',16,16],
+      ['skill-tail-turbo',16,16]] }
+};
+const RAW_KEYS = Object.keys(INVENTORY);
+const RAW_URL = k => 'raw-sprites/' + k + '.png.jpg';
+
+// Frames cuja arte veio em "line art" (miolo branco, contorno preto) e precisa
+// ser invertida para silhueta sólida — o jogo recoloriza 0=fg, 255=bg, então
+// corpo em bg sumiria no fundo. Mistura dentro do mesmo prompt (ex.: p11 tem
+// grad/top sólidos e crown/chef vazados) → decisão é por frame.
+const INV_FRAMES = new Set([
+  ...['cluck', 'rex', 'chubby', 'mecha', 'shinobi'].reduce((a, id) =>
+    a.concat(['run-0', 'run-1', 'jump-0', 'jump-1', 'fall', 'duck', 'peck', 'dead']
+      .map(p => id + '-' + p)), []),
+  'hat-crown', 'hat-ribbon', 'hat-viking', 'hat-chef',
+  'skill-nest-evolution', 'skill-armor-feathers', 'skill-double-sequence',
+  'skill-elastic-jump', 'skill-escape-reflex', 'skill-slide-blade',
+  'skill-perfect-hunt', 'skill-tail-turbo'
+]);
+
+// paletas iguis às de js/game.js (PALETTES / THEME_KEYS)
+const PALETTES = {
+  mono:      { dayBg:[255,255,255], dayFg:[0,0,0],     nightBg:[0,0,0],     nightFg:[255,255,255] },
+  gameboy:   { dayBg:[139,172,15],  dayFg:[15,56,15],  nightBg:[15,56,15],  nightFg:[139,172,15] },
+  amber:     { dayBg:[255,176,0],   dayFg:[26,10,0],   nightBg:[26,10,0],   nightFg:[255,176,0] },
+  macintosh: { dayBg:[245,245,240], dayFg:[26,26,26],  nightBg:[26,26,26],  nightFg:[245,245,240] },
+  cyber:     { dayBg:[0,255,204],   dayFg:[4,10,18],   nightBg:[4,10,18],   nightFg:[0,255,204] }
+};
+const THEME_KEYS = ['mono','gameboy','amber','macintosh','cyber'];
+
+// ================= estado =================
+const G = { thr:128, tol:150, invert:false };
+const images = [];               // {key, name, img, canvas, ctx, invert, warnings[], frames[]}
+const badFrames = new Set();     // nomes marcadas para regenerar
+const $ = id => document.getElementById(id);
+const setStatus = t => { $('status').textContent = t; };
+
+function keyFromName(n) { return n.replace(/\.(png\.jpg|png|jpe?g)$/i, ''); }
+
+// ================= carga =================
+function addImage(key, img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  let inv = null;
+  try { inv = c.getContext('2d').getImageData(0, 0, c.width, c.height); } catch (e) {
+    alert('Canvas bloqueado (' + key + '): arquivos file:// não podem ser lidos por canvas.\n' +
+          'Use "escolher arquivos…" (drag-and-drop) ou rode um servidor local.');
+    throw e;
+  }
+  images.push({ key, name:key, img, canvas:c, ctx:c.getContext('2d'), src:inv,
+                invert:G.invert, warnings:[], frames:[] });
+}
+
+function loadUrl(key, url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => { try { addImage(key, img); res(); } catch (e) { rej(e); } };
+    img.onerror = () => rej(new Error('falha ao carregar ' + url));
+    img.src = url;
+  });
+}
+
+let autoRun = null;
+function autoLoad() {
+  if (autoRun) return autoRun;            // ?auto=1 + clique não carregam duas vezes
+  autoRun = (async () => {
+    setStatus('carregando ' + RAW_KEYS.length + ' imagens…');
+    $('cards').innerHTML = ''; images.length = 0;
+    for (const k of RAW_KEYS) await loadUrl(k, RAW_URL(k));
+    setStatus('processando…');
+    reprocess();
+  })().finally(() => { autoRun = null; });
+  return autoRun;
+}
+
+function loadFiles(files) {
+  $('cards').innerHTML = ''; images.length = 0;
+  const list = [...files].filter(f => /^image\//.test(f.type) || /\.(png|jpe?g)$/i.test(f.name));
+  let pending = list.length;
+  if (!pending) return;
+  list.sort((a,b) => a.name.localeCompare(b.name)).forEach(f => {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => { addImage(keyFromName(f.name), img); if (--pending === 0) { setStatus('processando…'); reprocess(); } };
+      img.src = r.result;
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+// ================= detecção de frames =================
+const isMag = (r,g,b,tol) => ((255-r) + g + (255-b)) <= tol;
+
+// Detecta as células (retângulos) dos `expect` frames de uma faixa:
+//  1) segmentos por coluna (arte em qualquer y da faixa);
+//  2) descarta ruído minúsculo (1-8px de arte solta entre frames);
+//  3) junta o menor gap interno até bater a contagem;
+//  4) se faltam frames, divide a MAIOR célula: primeiro por gap VERTICAL
+//     (linhas sem tinta — frames que se sobrepõem horizontalmente, ex. p13
+//     raposa+falcão), senão pela coluna com mais magenta (perfil de projeção).
+function detectCells(d, y0, y1, expect, tol) {
+  const solid = new Uint8Array(d.width);
+  for (let x = 0; x < d.width; x++) {
+    let all = 1;
+    for (let y = y0; y < y1; y++) {
+      const i = (y * d.width + x) * 4;
+      if (!isMag(d.data[i], d.data[i+1], d.data[i+2], tol)) { all = 0; break; }
+    }
+    solid[x] = all;
+  }
+  let segs = []; let start = null;
+  for (let x = 0; x <= d.width; x++) {
+    const s = x < d.width ? solid[x] : 1;
+    if (!s && start === null) start = x;
+    if (s && start !== null) { if (x - start >= 1) segs.push([start, x]); start = null; }
+  }
+  if (segs.length > 1) { // descarta ruído (1-8px de arte solta entre frames)
+    const w = segs.map(s => s[1] - s[0]).sort((a, b) => a - b);
+    const minW = Math.max(8, Math.round(w[w.length >> 1] * 0.08));
+    const clean = segs.filter(s => s[1] - s[0] >= minW);
+    if (clean.length > 0) segs = clean;
+  }
+  while (segs.length > expect) { // gaps internos estreitos (asa, onda…)
+    let bi = 1, bw = Infinity;
+    for (let i = 1; i < segs.length; i++) {
+      const g = segs[i][0] - segs[i-1][1];
+      if (g < bw) { bw = g; bi = i; }
+    }
+    segs.splice(bi - 1, 2, [segs[bi-1][0], segs[bi][1]]);
+  }
+  const cells = segs.map(s => ({ x0: s[0], x1: s[1], y0, y1 }));
+  const splits = [];
+  while (cells.length < expect) {
+    let bi = 0, ba = -1;
+    cells.forEach((c, i) => {
+      const a = (c.x1 - c.x0) * (c.y1 - c.y0);
+      if (a > ba) { ba = a; bi = i; }
+    });
+    const c = cells[bi];
+    if (c.x1 - c.x0 < 4 && c.y1 - c.y0 < 4) return null;
+    // 4a) gap vertical DENTRO da célula (só gaps internos: margem de topo/
+    //     fundo não separa frames). A arte real pode ter colunas finas
+    //     atravessando (ex.: p13 raposa+falcão) → em vez de exigir zero
+    //     tinta, aceita linha com ≤5% de tinta e fica com a sequência de
+    //     8+ linhas de menor soma (o "vale" mais claro da faixa).
+    const lim = Math.max(4, Math.round((c.x1 - c.x0) * 0.05));
+    let gs = -1, gsum = 0, gap = null;
+    const cand = (a, b, s) => { if (a > c.y0 && b < c.y1 && b - a >= 8 && (!gap || s < gap[2])) gap = [a, b, s]; };
+    for (let y = c.y0; y <= c.y1; y++) {
+      let n = 0;
+      if (y < c.y1) for (let x = c.x0; x < c.x1; x++) {
+        const i = (y * d.width + x) * 4;
+        if (!isMag(d.data[i], d.data[i+1], d.data[i+2], tol)) n++;
+      }
+      if (y < c.y1 && n <= lim) {
+        if (gs < 0) { gs = y; gsum = 0; }
+        gsum += n;
+      } else {
+        if (gs >= 0) cand(gs, y, gsum);
+        gs = -1;
+      }
+    }
+    if (gap) {
+      const yc = Math.round((gap[0] + gap[1]) / 2);
+      cells.splice(bi, 1,
+        { x0: c.x0, x1: c.x1, y0: c.y0, y1: yc },
+        { x0: c.x0, x1: c.x1, y0: yc, y1: c.y1 });
+      continue;
+    }
+    // 4b) gap horizontal: coluna com mais pixels magenta
+    let best = -1, bestV = -1;
+    for (let x = c.x0 + 2; x < c.x1 - 1; x++) {
+      let v = 0;
+      for (let y = c.y0; y < c.y1; y++) {
+        const i = (y * d.width + x) * 4;
+        if (isMag(d.data[i], d.data[i+1], d.data[i+2], tol)) v++;
+      }
+      if (v > bestV) { bestV = v; best = x; }
+    }
+    if (best < 0) return null;
+    splits.push(best);
+    cells.splice(bi, 1,
+      { x0: c.x0, x1: best, y0: c.y0, y1: c.y1 },
+      { x0: best, x1: c.x1, y0: c.y0, y1: c.y1 });
+  }
+  return { cells, splits };
+}
+
+function evenSplit(a, b, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push([Math.round(a + (b-a)*i/n), Math.round(a + (b-a)*(i+1)/n)]);
+  return out;
+}
+
+function detectRows(d, expect, tol) {
+  if (expect <= 1) return [[0, d.height]];
+  const bands = []; let start = null;
+  for (let y = 0; y <= d.height; y++) {
+    let all = 1;
+    if (y < d.height) {
+      for (let x = 0; x < d.width; x++) {
+        const i = (y * d.width + x) * 4;
+        if (!isMag(d.data[i], d.data[i+1], d.data[i+2], tol)) { all = 0; break; }
+      }
+    }
+    if (!all && start === null) start = y;
+    if (all && start !== null) { if (y - start >= 2) bands.push([start, y]); start = null; }
+  }
+  return bands.length === expect ? bands : null;
+}
+
+// aperta o retângulo às bordas não-magenta (margem interna da célula)
+function tighten(d, x0, x1, y0, y1, tol) {
+  let minX = x1, minY = y1, maxX = -1, maxY = -1;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = (y * d.width + x) * 4;
+    if (!isMag(d.data[i], d.data[i+1], d.data[i+2], tol)) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+  }
+  return maxX < 0 ? null : { x:minX, y:minY, w:maxX-minX+1, h:maxY-minY+1 };
+}
+
+// ================= processamento de uma célula =================
+function processCell(d, box, tw, th, opt) {
+  const out = new Uint8ClampedArray(tw * th * 4);
+  let minX = box.w, minY = box.h, maxX = -1, maxY = -1;
+  const mask = new Uint8Array(box.w * box.h); // 0 vazio, 1 preto, 2 branco
+  for (let y = 0; y < box.h; y++) for (let x = 0; x < box.w; x++) {
+    const si = ((box.y + y) * d.width + box.x + x) * 4;
+    const r = d.data[si], g = d.data[si+1], b = d.data[si+2];
+    if (isMag(r, g, b, opt.tol)) continue;
+    const lum = 0.299*r + 0.587*g + 0.114*b;
+    let black = lum < opt.thr;
+    if (opt.invert) black = !black;
+    mask[y * box.w + x] = black ? 1 : 2;
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  if (maxX < 0) return null;                       // célula vazia
+  const cw = maxX - minX + 1, ch = maxY - minY + 1;
+  // contain: escala preservando proporção, ancorado embaixo + centrado
+  const s = Math.min(tw / cw, th / ch);
+  let dw = Math.max(1, Math.min(tw, Math.round(cw * s)));
+  let dh = Math.max(1, Math.min(th, Math.round(ch * s)));
+  const ox = Math.floor((tw - dw) / 2), oy = th - dh;
+  let ix0 = tw, iy0 = th, ix1 = -1, iy1 = -1;      // bbox real da tinta gravada
+  for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+    const sx = minX + Math.min(cw - 1, Math.floor(x * cw / dw));
+    const sy = minY + Math.min(ch - 1, Math.floor(y * ch / dh));
+    const m = mask[sy * box.w + sx];
+    if (!m) continue;
+    const gx = x + ox, gy = y + oy;
+    if (gx < ix0) ix0 = gx; if (gx > ix1) ix1 = gx;
+    if (gy < iy0) iy0 = gy; if (gy > iy1) iy1 = gy;
+    const di = (gy * tw + gx) * 4;
+    const v = m === 1 ? 0 : 255;
+    out[di] = out[di+1] = out[di+2] = v; out[di+3] = 255;
+  }
+  if (ix1 < 0) return null;                         // resample não gravou nada
+  // ink: bbox da arte DENTRO da frame [x, y, w, h] — o jogo usa para casar a
+  // tinta com a caixa do desenho em código (game.js CHICKEN_ART)
+  return { data: new ImageData(out, tw, th), ink: [ix0, iy0, ix1 - ix0 + 1, iy1 - iy0 + 1] };
+}
+
+// ================= pipeline por imagem =================
+function reprocess() {
+  const total = images.reduce((n, im) => n + INVENTORY[im.key].frames.length, 0);
+  const master = document.createElement('canvas');
+  const ctxM = master.getContext('2d');
+  const allFrames = [];
+  let warnings = [];
+
+  // 1) processa todas as células de todas as imagens
+  for (const im of images) {
+    const spec = INVENTORY[im.key];
+    const d = im.src, opt = { thr:G.thr, tol:G.tol, invert:im.invert };
+    im.warnings = []; im.frames = []; im.segs = [];
+    const rows = detectRows(d, spec.rows.length, opt.tol) || evenSplit(0, d.height, spec.rows.length);
+    if (!detectRows(d, spec.rows.length, opt.tol))
+      im.warnings.push('linhas: detecção falhou, corte igual (' + spec.rows.length + ')');
+    let fi = 0;
+    for (let r = 0; r < rows.length; r++) {
+      const [ry0, ry1] = rows[r];
+      const expect = spec.rows[r];
+      let det = detectCells(d, ry0, ry1, expect, opt.tol);
+      let cells, splits = [];
+      if (!det) {
+        im.warnings.push('colunas linha ' + (r+1) + ': detecção falhou, corte igual');
+        cells = evenSplit(0, d.width, expect).map(c => ({ x0:c[0], x1:c[1], y0:ry0, y1:ry1 }));
+        splits = cells.slice(1).map(c => c.x0);
+      } else { cells = det.cells; splits = det.splits; }
+      im.segs = (im.segs || []).concat(cells.map(c =>
+        r + ':' + c.x0 + '-' + c.x1 + '/' + c.y0 + '-' + c.y1));
+      // divisão artificial caiu em coluna com tinta → possível frame cortada
+      const bandH = ry1 - ry0;
+      for (const sx of splits) {
+        let ink = 0;
+        for (let y = ry0; y < ry1; y++) {
+          const i = (y * d.width + sx) * 4;
+          if (!isMag(d.data[i], d.data[i+1], d.data[i+2], opt.tol)) ink++;
+        }
+        if (ink > bandH * 0.15) im.warnings.push('corte possível na coluna ' + sx);
+      }
+      // aperta cada célula e ordena pela posição real da arte: frames
+      // separados por gap vertical podem ter a ordem invertida em x
+      const boxes = cells.map(c => tighten(d, c.x0, c.x1, c.y0, c.y1, opt.tol));
+      const order = boxes.map((b, i) => i).filter(i => boxes[i])
+        .sort((a, b) => boxes[a].x - boxes[b].x);
+      if (order.length !== cells.length)
+        im.warnings.push('linha ' + (r+1) + ': ' + (cells.length - order.length) + ' célula vazia');
+      for (const i of order) {
+        const box = boxes[i];
+        const [name, tw, th] = spec.frames[fi++];
+        // XOR: checkbox global "inverter" + inversão pontual desta frame
+        const res = processCell(d, box, tw, th,
+          { thr: opt.thr, tol: opt.tol, invert: opt.invert !== INV_FRAMES.has(name) });
+        if (!res) im.warnings.push(name + ': sem arte após corte');
+        im.frames.push({ name, tw, th, data: res && res.data, ink: res && res.ink, box });
+      }
+    }
+    if (fi !== spec.frames.length)
+      im.warnings.push('esperava ' + spec.frames.length + ' frames, achou ' + fi);
+    warnings = warnings.concat(im.warnings.map(w => im.key + ': ' + w));
+  }
+
+  // 2) empacota (grade, gutter 2px, largura máx 1024, potência de 2)
+  const GW = 1024, pad = 2;
+  let x = pad, y = pad, rowH = 0, usedW = 0;
+  const pos = {};
+  for (const im of images) for (const f of im.frames) {
+    if (!pos[f.name]) pos[f.name] = f;      // primeiro registro ganha (não deve haver duplicata)
+    if (x + f.tw + pad > GW) { x = pad; y += rowH + pad; rowH = 0; }
+    f.x = x; f.y = y; x += f.tw + pad; rowH = Math.max(rowH, f.th);
+    usedW = Math.max(usedW, x);
+  }
+  const usedH = y + rowH + pad;
+  const pow2 = v => { let p = 1; while (p < v) p *= 2; return p; };
+  master.width = pow2(usedW); master.height = pow2(usedH);
+  ctxM.clearRect(0, 0, master.width, master.height);
+
+  // 3) desenha as células na folha master (preto/branco + alfa)
+  let frameCount = 0;
+  for (const im of images) for (const f of im.frames) {
+    if (f.data) { ctxM.putImageData(f.data, f.x, f.y); frameCount++; }
+  }
+
+  window.__master = master;
+  window.__images = images;
+  window.__frameList = images.flatMap(im => im.frames.map(f =>
+    ({ name:f.name, x:f.x, y:f.y, w:f.tw, h:f.th, ink:f.ink })));
+
+  renderCards();
+  const bad = [...badFrames].length;
+  setStatus(frameCount + '/' + total + ' frames' + (warnings.length ? ' — ' + warnings.length + ' aviso(s)' : ' — ok'));
+  $('summary').textContent = 'folha ' + master.width + '×' + master.height +
+    ' · ' + frameCount + ' frames · ' + images.length + ' imagens' +
+    (warnings.length ? ' · ⚠ ' + warnings.length : '') + (bad ? ' · ❌ ' + bad : '');
+  return report();
+}
+
+function report() {
+  return {
+    images: images.map(im => ({ key:im.key, expected:INVENTORY[im.key].frames.length,
+                                got:im.frames.length, warnings:im.warnings })),
+    frames: window.__frameList ? window.__frameList.length : 0,
+    sheet: window.__master ? { w:window.__master.width, h:window.__master.height } : null,
+    bad: [...badFrames],
+    ok: warningsCount() === 0
+  };
+}
+function warningsCount() { return images.reduce((n, im) => n + im.warnings.length, 0); }
+
+// ================= exportação =================
+function buildManifest() {
+  const m = { frameW:16, frameH:22, frames:{} };
+  for (const f of window.__frameList) {
+    const fr = { x:f.x, y:f.y, w:f.w, h:f.h };
+    // ink só quando a arte não ocupa a frame inteira (bbox da tinta)
+    if (f.ink && (f.ink[0] || f.ink[1] || f.ink[2] !== f.w || f.ink[3] !== f.h))
+      fr.ink = f.ink;
+    m.frames[f.name] = fr;
+  }
+  return m;
+}
+
+function tintSheet(master, fg, bg) {
+  const c = document.createElement('canvas');
+  c.width = master.width; c.height = master.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(master, 0, 0);
+  const id = ctx.getImageData(0, 0, c.width, c.height), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i+3]) continue;
+    const v = d[i] < 128 ? fg : bg;
+    d[i] = v[0]; d[i+1] = v[1]; d[i+2] = v[2];
+  }
+  ctx.putImageData(id, 0, 0);
+  return c;
+}
+
+function regenerateMd() {
+  const byImage = {};
+  for (const n of badFrames) {
+    const im = images.find(i => i.frames.some(f => f.name === n));
+    if (!im) continue;
+    (byImage[im.key] = byImage[im.key] || []).push(n);
+  }
+  let out = '# Frames para regenerar\n\n';
+  for (const k in byImage) out += '- **' + k.toUpperCase() + '** (prompt §4): ' + byImage[k].join(', ') + '\n';
+  return out;
+}
+
+async function exportAll() {
+  if (!window.__master) throw new Error('nada processado ainda');
+  const out = [];
+  const master = window.__master;
+  out.push({ name:'sheet-master.png', data:master.toDataURL('image/png') });
+
+  const manifest = buildManifest();
+  const json = JSON.stringify(manifest, null, 2);
+  out.push({ name:'manifest.json', data:'data:application/json;base64,' + btoa(json) });
+  out.push({ name:'manifest.js',
+             data:'data:text/javascript;base64,' + btoa('window.SPRITE_MANIFEST = ' + json + ';\n') });
+
+  for (const key of THEME_KEYS) {
+    const p = PALETTES[key];
+    for (const phase of ['day','night']) {
+      const fg = phase === 'day' ? p.dayFg : p.nightFg;
+      const bg = phase === 'day' ? p.dayBg : p.nightBg;
+      out.push({ name:'sheet-' + key + '-' + phase + '.png',
+                 data:tintSheet(master, fg, bg).toDataURL('image/png') });
+    }
+  }
+  if (badFrames.size) out.push({ name:'REGENERATE.md',
+                                 data:'data:text/markdown;base64,' + btoa(regenerateMd()) });
+  return out;
+}
+
+// ================= UI =================
+function renderCards() {
+  const wrap = $('cards');
+  wrap.innerHTML = '';
+  for (const im of images) {
+    const spec = INVENTORY[im.key];
+    const card = document.createElement('div');
+    card.className = 'card';
+    const ok = im.warnings.length === 0 && im.frames.length === spec.frames.length;
+    const h = document.createElement('h2');
+    h.innerHTML = im.key + ' <span class="' + (ok ? 'ok' : 'warn') + '">' +
+      (ok ? '✓ ' + im.frames.length + ' frames' : '⚠ ' + im.warnings.join(' · ')) + '</span>';
+    card.appendChild(h);
+
+    const row = document.createElement('div'); row.className = 'row';
+
+    const orig = document.createElement('div'); orig.className = 'orig';
+    const co = document.createElement('canvas');
+    co.width = im.canvas.width; co.height = im.canvas.height;
+    co.getContext('2d').drawImage(im.canvas, 0, 0);
+    orig.appendChild(co);
+    row.appendChild(orig);
+
+    const strip = document.createElement('div'); strip.className = 'strip';
+    for (const f of im.frames) {
+      const fc = document.createElement('div');
+      fc.className = 'frame' + (badFrames.has(f.name) ? ' bad' : '');
+      fc.title = f.name + ' — clique para marcar/desmarcar ❌';
+      const scale = Math.max(2, Math.min(8, Math.floor(140 / Math.max(f.tw, f.th, 1))));
+      const c = document.createElement('canvas');
+      c.width = f.tw * scale; c.height = f.th * scale;
+      const cx = c.getContext('2d'); cx.imageSmoothingEnabled = false;
+      if (f.data) {
+        const tmp = document.createElement('canvas');
+        tmp.width = f.tw; tmp.height = f.th;
+        tmp.getContext('2d').putImageData(f.data, 0, 0);
+        cx.drawImage(tmp, 0, 0, c.width, c.height);
+      }
+      const label = document.createElement('div');
+      label.textContent = f.name + ' ' + f.tw + '×' + f.th;
+      fc.appendChild(c); fc.appendChild(label);
+      fc.onclick = () => {
+        badFrames.has(f.name) ? badFrames.delete(f.name) : badFrames.add(f.name);
+        fc.classList.toggle('bad');
+        $('summary').textContent = (badFrames.size ? '❌ ' + [...badFrames].join(', ') : 'sem marcas ❌');
+      };
+      strip.appendChild(fc);
+    }
+    row.appendChild(strip);
+    card.appendChild(row);
+
+    const opts = document.createElement('div'); opts.className = 'opts';
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = im.invert;
+    cb.onchange = () => { im.invert = cb.checked; reprocess(); };
+    lbl.appendChild(cb); lbl.appendChild(document.createTextNode(' inverter'));
+    opts.appendChild(lbl);
+    card.appendChild(opts);
+
+    wrap.appendChild(card);
+  }
+}
+
+// ---- controles ----
+$('thr').oninput = e => { G.thr = +e.target.value; $('thrV').textContent = G.thr; reprocess(); };
+$('tol').oninput = e => { G.tol = +e.target.value; $('tolV').textContent = G.tol; reprocess(); };
+$('invert').onchange = e => { G.invert = e.target.checked; images.forEach(im => im.invert = G.invert); reprocess(); };
+$('btnAuto').onclick = () => autoLoad().catch(e => setStatus('ERRO: ' + e.message));
+$('btnFiles').onclick = () => $('fileInput').click();
+$('fileInput').onchange = e => loadFiles(e.target.files);
+$('btnExport').onclick = async () => {
+  try {
+    const files = await exportAll();
+    setStatus('baixando ' + files.length + ' arquivos…');
+    for (const f of files) {
+      const a = document.createElement('a');
+      a.href = f.data; a.download = f.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      await new Promise(r => setTimeout(r, 250));
+    }
+    setStatus('exportado: ' + files.map(f => f.name).join(', '));
+  } catch (e) { setStatus('ERRO export: ' + e.message); }
+};
+
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('hot'); };
+drop.ondragleave = () => drop.classList.remove('hot');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('hot'); loadFiles(e.dataTransfer.files); };
+
+// ================= API de automação =================
+window.sheetTool = {
+  auto: async () => { await autoLoad(); return report(); },
+  report,
+  exportAll,
+  setOpt: (k, v) => { G[k] = v; reprocess(); return report(); },
+  images: () => images.map(im => im.key),
+  // renderiza uma frame processada em texto (# = preto, . = branco, espaço = vazio)
+  ascii: (name) => {
+    for (const im of images) for (const f of im.frames) if (f.name === name) {
+      if (!f.data) return '(vazia)';
+      const d = f.data.data, out = [];
+      for (let y = 0; y < f.th; y++) {
+        let line = '';
+        for (let x = 0; x < f.tw; x++) {
+          const i = (y * f.tw + x) * 4;
+          line += !d[i + 3] ? ' ' : d[i] < 128 ? '#' : '.';
+        }
+        out.push(line);
+      }
+      return out.join('\n');
+    }
+    return '(frame não encontrada: ' + name + ')';
+  }
+};
+
+if (new URLSearchParams(location.search).get('auto') === '1') {
+  setStatus('auto: carregando…');
+  autoLoad().catch(e => setStatus('ERRO: ' + e.message));
+}
+</script>
+</body>
+</html>

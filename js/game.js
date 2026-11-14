@@ -500,6 +500,9 @@ const BADGES = [
   { id: 'close_call',   title: 'CLOSE CALL',   desc: 'SCORE 3 NEAR-MISS DODGES' }
 ];
 let unlockedBadges = [false, false, false, false, false, false];
+// frames badge-* do sheet P17, na mesma ordem de BADGES
+const BADGE_FRAMES = ['badge-first-flight', 'badge-night-owl', 'badge-four-seasons',
+                      'badge-star-magnate', 'badge-speed-demon', 'badge-close-call'];
 try {
   const ub = JSON.parse(localStorage.getItem(BADGES_KEY) || '[]');
   if (Array.isArray(ub)) for (let i = 0; i < BADGES.length; i++) unlockedBadges[i] = !!ub[i];
@@ -2397,20 +2400,31 @@ function drawGround(pal, ssn) {
   for (let j = j0; j * step - groundOff < W + step; j++) {
     const sx = Math.round(j * step - groundOff);
     const r = gdec ? ((j % 40) + 40) % 40 : -1;
-    if (r === 3) { box(sx + 8, GROUND - 4, 24, 4); box(sx + 14, GROUND - 7, 12, 3); }
-    else if (r === 11 || r === 27) { box(sx + 6, GROUND + 8, 4, 3); box(sx + 22, GROUND + 14, 3, 3); box(sx + 34, GROUND + 9, 5, 2); }
-    else if (r === 19 || r === 33) { box(sx + 10, GROUND + 13, 14, 2); box(sx + 32, GROUND + 9, 6, 2); }
-    else if (ssn === 0 && (r === 7 || r === 25)) {
-      box(sx + 14, GROUND - 13, 5, 5);
-      ctx.fillStyle = pal.bg; box(sx + 16, GROUND - 11, 1, 1); ctx.fillStyle = pal.fg;
-      box(sx + 15, GROUND - 8, 3, 5);
-      box(sx + 9, GROUND - 3, 3, 3); box(sx + 26, GROUND - 3, 3, 3);
+    // sprites P15 (ground-*): caixa na proporção da frame p/ não distorcer;
+    // folha/frame faltando → spr() false → desenho antigo em código
+    if (r === 3) {
+      if (!spr('ground-stone', sx + 8, GROUND - 18, 24, 18)) { box(sx + 8, GROUND - 4, 24, 4); box(sx + 14, GROUND - 7, 12, 3); }
+    } else if (r === 11 || r === 27) {
+      if (!spr('ground-pebbles', sx + 6, GROUND + 8, 33, 10)) { box(sx + 6, GROUND + 8, 4, 3); box(sx + 22, GROUND + 14, 3, 3); box(sx + 34, GROUND + 9, 5, 2); }
+    } else if (r === 19 || r === 33) {
+      box(sx + 10, GROUND + 13, 14, 2); box(sx + 32, GROUND + 9, 6, 2);   // sem frame no P15: fica em código
+    } else if (ssn === 0 && (r === 7 || r === 25)) {
+      if (!spr('ground-flower', sx + 13, GROUND - 23, 12, 23)) {
+        box(sx + 14, GROUND - 13, 5, 5);
+        ctx.fillStyle = pal.bg; box(sx + 16, GROUND - 11, 1, 1); ctx.fillStyle = pal.fg;
+        box(sx + 15, GROUND - 8, 3, 5);
+        box(sx + 9, GROUND - 3, 3, 3); box(sx + 26, GROUND - 3, 3, 3);
+      }
     } else if (ssn === 2 && (r === 15 || r === 31)) {
-      box(sx + 12, GROUND - 4, 5, 4);
-      ctx.fillStyle = pal.bg; box(sx + 12, GROUND - 4, 1, 1); ctx.fillStyle = pal.fg;
+      if (!spr('ground-mushroom', sx + 8, GROUND - 16, 14, 16)) {
+        box(sx + 12, GROUND - 4, 5, 4);
+        ctx.fillStyle = pal.bg; box(sx + 12, GROUND - 4, 1, 1); ctx.fillStyle = pal.fg;
+      }
     } else if (ssn === 3 && (r === 9 || r === 23)) {
-      box(sx + 8, GROUND - 6, 22, 6);
-      box(sx + 13, GROUND - 9, 12, 3);
+      if (!spr('ground-snow', sx + 8, GROUND - 12, 22, 12)) {
+        box(sx + 8, GROUND - 6, 22, 6);
+        box(sx + 13, GROUND - 9, 12, 3);
+      }
     }
   }
   box(0, GROUND, W, 3);
@@ -2676,6 +2690,10 @@ window._starScaleCurrent = 1;
 
 function drawSpeaker(pal, mode) {
   const x = SPEAKER_BOX.x, y = SPEAKER_BOX.y;
+  // sprites P17 (speaker-*): proporção da frame preservada; fallback = código
+  if (mode === 2 ? spr('speaker-muted', x, y + 3, 26, 19)
+       : mode === 1 ? spr('speaker-sfx', x, y + 3, 21, 19)
+                 : spr('speaker-all', x, y + 3, 23, 20)) return;
   ctx.fillStyle = pal.fg;
   box(x, y + 9, 5, 8);
   box(x + 5, y + 6, 4, 14);
@@ -2977,6 +2995,9 @@ function drawScreens(pal, t) {
       const mark = isUn ? '★' : '□';
       drawText(mark + ' ' + b.title, bx + 10, by + 7, 2, pal.fg);
       drawText(b.desc, bx + 10, by + 27, 2, pal.fg);
+      // ícone (sheet P17) à direita da caixa; se a folha falhar, só o texto fica
+      const fr = SPRITES.manifest && SPRITES.manifest.frames[BADGE_FRAMES[idx]];
+      if (fr) spr(BADGE_FRAMES[idx], bx + colW - fr.w - 10, by + Math.round((boxH - fr.h) / 2), fr.w, fr.h);
     });
 
     addButton('btn_badg_back', W / 2 - 70, 236, 140, 28, () => { state = 'menu'; }, 'BACK');

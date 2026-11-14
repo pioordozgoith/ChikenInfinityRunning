@@ -56,7 +56,7 @@
   <label>limiar <input type="range" id="thr" min="40" max="220" value="128"><span id="thrV">128</span></label>
   <label>tol. magenta <input type="range" id="tol" min="30" max="300" value="150"><span id="tolV">150</span></label>
   <label><input type="checkbox" id="invert"> inverter preto/branco (global)</label>
-  <button id="btnAuto" class="primary">carregar raw-sprites/ (16)</button>
+  <button id="btnAuto" class="primary">carregar raw-sprites/ (18)</button>
   <button id="btnFiles">escolher arquivos&hellip;</button>
   <button id="btnExport" class="primary">exportar tudo</button>
   <span id="summary" class="hint"></span>
@@ -96,7 +96,12 @@ const INVENTORY = {
   'p12-obstacles-ground':{ rows:[5], frames:[['obs-spike',57,22],['obs-barrier',44,39],['obs-stack',35,50],['obs-fence',51,34],['obs-hay',45,45]] },
   'p13-obstacles-animals':{ rows:[6], frames:[['obs-fox-0',83,46],['obs-fox-1',71,39],['obs-falcon-0',76,27],['obs-falcon-1',95,34],['obs-owl-0',122,51],['obs-owl-1',94,39]] },
   'p14-items-particles':{ rows:[9], frames:[['star',15,13],['feather-0',9,9],['feather-1',9,9],['petal-0',6,6],['petal-1',6,6],['leaf-0',8,8],['leaf-1',8,8],['flake-big',13,13],['flake-small',8,8]] },
+  'p15-ground-decor':   { rows:[5], frames:[['ground-stone',34,25],['ground-flower',24,45],['ground-mushroom',35,40],['ground-snow',50,28],['ground-pebbles',40,12]] },
   'p16-sky':            { rows:[4], frames:[['cloud-big',20,12],['cloud-small',14,8],['sun',11,12],['moon',11,13]] },
+  'p17-ui-badges-speaker': { rows:[6,3], frames:[
+      ['badge-first-flight',29,31],['badge-night-owl',27,28],['badge-four-seasons',30,32],
+      ['badge-star-magnate',32,30],['badge-speed-demon',34,30],['badge-close-call',28,31],
+      ['speaker-all',34,30],['speaker-sfx',32,28],['speaker-muted',39,28]] },
   'p18-skills':         { rows:[5,5], frames:[
       ['skill-nest-evolution',35,35],['skill-armor-feathers',36,36],['skill-double-sequence',36,36],
       ['skill-elastic-jump',36,36],['skill-escape-reflex',35,35],['skill-blazing-hen',37,37],
@@ -117,7 +122,10 @@ const INV_FRAMES = new Set([
   'hat-crown', 'hat-ribbon', 'hat-viking', 'hat-chef',
   'skill-nest-evolution', 'skill-armor-feathers', 'skill-double-sequence',
   'skill-elastic-jump', 'skill-escape-reflex', 'skill-slide-blade',
-  'skill-perfect-hunt', 'skill-tail-turbo'
+  'skill-perfect-hunt', 'skill-tail-turbo',
+  // P15: monte de neve é silhueta sólida no código antigo (miolo branco viraria
+  // buraco no fundo) — inverte para corpo sólido com marcas de detalhe
+  'ground-snow'
 ]);
 
 // paletas iguis às de js/game.js (PALETTES / THEME_KEYS)

@@ -590,8 +590,62 @@ window.SPRITE_MANIFEST = {
       "w": 8,
       "h": 8
     },
-    "cloud-big": {
+    "ground-stone": {
       "x": 702,
+      "y": 130,
+      "w": 34,
+      "h": 25
+    },
+    "ground-flower": {
+      "x": 738,
+      "y": 130,
+      "w": 24,
+      "h": 45,
+      "ink": [
+        0,
+        7,
+        24,
+        38
+      ]
+    },
+    "ground-mushroom": {
+      "x": 764,
+      "y": 130,
+      "w": 35,
+      "h": 40,
+      "ink": [
+        0,
+        3,
+        35,
+        37
+      ]
+    },
+    "ground-snow": {
+      "x": 801,
+      "y": 130,
+      "w": 50,
+      "h": 28,
+      "ink": [
+        0,
+        1,
+        50,
+        27
+      ]
+    },
+    "ground-pebbles": {
+      "x": 853,
+      "y": 130,
+      "w": 40,
+      "h": 12,
+      "ink": [
+        4,
+        0,
+        32,
+        12
+      ]
+    },
+    "cloud-big": {
+      "x": 895,
       "y": 130,
       "w": 20,
       "h": 12,
@@ -603,13 +657,13 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "cloud-small": {
-      "x": 724,
+      "x": 917,
       "y": 130,
       "w": 14,
       "h": 8
     },
     "sun": {
-      "x": 740,
+      "x": 933,
       "y": 130,
       "w": 11,
       "h": 12,
@@ -621,7 +675,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "moon": {
-      "x": 753,
+      "x": 946,
       "y": 130,
       "w": 11,
       "h": 13,
@@ -632,9 +686,93 @@ window.SPRITE_MANIFEST = {
         10
       ]
     },
-    "skill-nest-evolution": {
-      "x": 766,
+    "badge-first-flight": {
+      "x": 959,
       "y": 130,
+      "w": 29,
+      "h": 31,
+      "ink": [
+        0,
+        1,
+        29,
+        30
+      ]
+    },
+    "badge-night-owl": {
+      "x": 990,
+      "y": 130,
+      "w": 27,
+      "h": 28
+    },
+    "badge-four-seasons": {
+      "x": 2,
+      "y": 183,
+      "w": 30,
+      "h": 32,
+      "ink": [
+        0,
+        3,
+        30,
+        29
+      ]
+    },
+    "badge-star-magnate": {
+      "x": 34,
+      "y": 183,
+      "w": 32,
+      "h": 30,
+      "ink": [
+        0,
+        0,
+        31,
+        30
+      ]
+    },
+    "badge-speed-demon": {
+      "x": 68,
+      "y": 183,
+      "w": 34,
+      "h": 30
+    },
+    "badge-close-call": {
+      "x": 104,
+      "y": 183,
+      "w": 28,
+      "h": 31,
+      "ink": [
+        1,
+        0,
+        25,
+        31
+      ]
+    },
+    "speaker-all": {
+      "x": 134,
+      "y": 183,
+      "w": 34,
+      "h": 30
+    },
+    "speaker-sfx": {
+      "x": 170,
+      "y": 183,
+      "w": 32,
+      "h": 28,
+      "ink": [
+        1,
+        0,
+        30,
+        28
+      ]
+    },
+    "speaker-muted": {
+      "x": 204,
+      "y": 183,
+      "w": 39,
+      "h": 28
+    },
+    "skill-nest-evolution": {
+      "x": 245,
+      "y": 183,
       "w": 35,
       "h": 35,
       "ink": [
@@ -645,8 +783,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-armor-feathers": {
-      "x": 803,
-      "y": 130,
+      "x": 282,
+      "y": 183,
       "w": 36,
       "h": 36,
       "ink": [
@@ -657,8 +795,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-double-sequence": {
-      "x": 841,
-      "y": 130,
+      "x": 320,
+      "y": 183,
       "w": 36,
       "h": 36,
       "ink": [
@@ -669,8 +807,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-elastic-jump": {
-      "x": 879,
-      "y": 130,
+      "x": 358,
+      "y": 183,
       "w": 36,
       "h": 36,
       "ink": [
@@ -681,8 +819,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-escape-reflex": {
-      "x": 917,
-      "y": 130,
+      "x": 396,
+      "y": 183,
       "w": 35,
       "h": 35,
       "ink": [
@@ -693,8 +831,8 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-blazing-hen": {
-      "x": 954,
-      "y": 130,
+      "x": 433,
+      "y": 183,
       "w": 37,
       "h": 37,
       "ink": [
@@ -705,7 +843,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-slide-blade": {
-      "x": 2,
+      "x": 472,
       "y": 183,
       "w": 34,
       "h": 34,
@@ -717,7 +855,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-golden-hen": {
-      "x": 38,
+      "x": 508,
       "y": 183,
       "w": 36,
       "h": 36,
@@ -729,7 +867,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-perfect-hunt": {
-      "x": 76,
+      "x": 546,
       "y": 183,
       "w": 37,
       "h": 37,
@@ -741,7 +879,7 @@ window.SPRITE_MANIFEST = {
       ]
     },
     "skill-tail-turbo": {
-      "x": 115,
+      "x": 585,
       "y": 183,
       "w": 36,
       "h": 36,

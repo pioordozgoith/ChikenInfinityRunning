@@ -1395,6 +1395,43 @@ const CHICKEN_ART = {
              duck: [1,2,22,10], peck: [0,1,19,11], dead: [-1,2,24,10] }
 };
 
+// Obstáculos vivos (fox/falcon/owl): caixa visual [dx,dy,w,h] em unidades de
+// código, relativa ao canto da hitbox — a mesma extensão do desenho antigo.
+// As 2 frames de cada tipo são escaladas com UM só fator k (o menor que cabe
+// ambas na caixa): a arte mantém o tamanho relativo do raw, sem distorção e
+// sem salto de tamanho entre frames. X centrado na caixa; bottom da caixa no
+// chão/talons (mesma ancoragem do desenho antigo). Owl tem caixa mais alta que
+// a hitbox (34 vs 20) porque, sob escala uniforme, a arte quadrada dele (52x51)
+// só caberia como miniatura; o excesso sobe p/ cima, onde não há colisão.
+// k é recalculado no draw a partir do manifesto → arte regenerada reencaixa só.
+const OBS_ART = {
+  fox:    { box: [0,  0, 54, 32] },   // bottom y+32 = pés no chão
+  falcon: { box: [8, -4, 48, 26] },   // bottom y+22, top y-4 (voa)
+  owl:    { box: [0,-14, 48, 34] },   // bottom y+20 = talons
+};
+
+// Desenha o obstáculo vivo pelo sheet dentro da caixa de OBS_ART. false =
+// folha/frame/caixa faltando → o desenho em código é chamado (fallback).
+function sprObs(type, fr, x, y) {
+  const man = SPRITES.ready ? SPRITES.manifest : null;
+  const b = OBS_ART[type] && OBS_ART[type].box;
+  if (!man || !b) return false;
+  const name = 'obs-' + type + '-' + fr;
+  const f = man.frames[name];
+  if (!f) return false;
+  // um k só p/ as 2 frames do tipo → sem distorção e sem flicker de tamanho
+  let k = Infinity;
+  for (const g of [man.frames['obs-' + type + '-0'], man.frames['obs-' + type + '-1']]) {
+    if (!g) return false;
+    const gi = g.ink || [0, 0, g.w, g.h];
+    k = Math.min(k, b[2] / gi[2], b[3] / gi[3]);
+  }
+  const ink = f.ink || [0, 0, f.w, f.h];
+  const dx = x + b[0] + (b[2] - ink[2] * k) / 2;   // centrado na caixa
+  const dy = y + b[1] + b[3] - ink[3] * k;         // bottom da caixa
+  return sprInk(name, ink, dx, dy, ink[2] * k, ink[3] * k);
+}
+
 // Sprite da galinha pelo sheet. Retorna o topo (px) desenhado, ou false quando
 // folha/frame/caixa faltam → o desenho em código é chamado (fallback).
 function drawChickenSprite(pal, x, yTop, mode, frame, blinkOn, idx) {
@@ -1499,12 +1536,14 @@ function makeObstacle(type, x) {
 
 function drawObstacle(pal, t, o) {
   const x = Math.round(o.x), y = Math.round(o.y);
-  // sheet: fox/falcon/owl alternam frame por tempo (como o desenho antigo)
+  // sheet: fox/falcon/owl alternam frame por tempo (como o desenho antigo);
+  // vivos passam pela caixa de OBS_ART, estáticos continuam frame cheia
   {
     const fr = o.type === 'fox' ? Math.floor(t * 6) % 2
       : o.type === 'falcon' ? Math.floor(t * 12) % 2
       : o.type === 'owl' ? Math.floor(t * 8) % 2 : -1;
-    if (spr('obs-' + o.type + (fr >= 0 ? '-' + fr : ''), x, y, o.w, o.h)) return;
+    if (fr >= 0 ? sprObs(o.type, fr, x, y)
+                : spr('obs-' + o.type, x, y, o.w, o.h)) return;
   }
   ctx.fillStyle = pal.fg;
   if (o.type === 'stack') {

@@ -1451,8 +1451,9 @@ function drawChickenSprite(pal, x, yTop, mode, frame, blinkOn, idx) {
   const ink = f.ink || [0, 0, f.w, f.h];                 // sem ink = frame inteira
   // Escala uniforme casando a ALTURA com a caixa do código (pés no chão e chapéu
   // encostado). No peck a arte do sheet é em pé e a do código é agachada → casa a
-  // LARGURA, senão a galinha viraria uma miniatura.
-  const k = pose === 'peck' ? T[2] * S / ink[2] : T[3] * S / ink[3];
+  // LARGURA, senão a galinha viraria uma miniatura. No dead vale a mesma troca:
+  // sheet sentado ereto (quadrado) vs código achatado → casa a LARGURA também.
+  const k = (pose === 'peck' || pose === 'dead') ? T[2] * S / ink[2] : T[3] * S / ink[3];
   const dx = rx + Math.max(T[0], 0) * S;                 // ignora efeitos à esquerda
   const dy = ry + (T[1] + T[3]) * S - ink[3] * k;        // bottom igual ao código
   if (!sprInk(name, ink, dx, dy, ink[2] * k, ink[3] * k)) return false;

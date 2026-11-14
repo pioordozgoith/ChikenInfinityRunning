@@ -799,8 +799,8 @@ Após a implementação (§7), verificar:
 - [ ] Os 8 obstáculos: spawn, hitbox (pulo/deslize), animação da raposa/falcão/coruja
 - [ ] Estrela coletável: tamanho do HUD, tamanho no jogo, tamanho na morte (configs de `starSize*`)
 - [ ] Partículas das 4 estações + nuvens + sol (verão) + lua (noite)
-- [ ] Decorações do chão por estação (flor/primavera, cogumelo/outono, neve/inverno)
-- [ ] Ícones de badge/som/skills aparecem e ficam nítidos
+- [x] Decorações do chão por estação (flor/primavera, cogumelo/outono, neve/inverno)
+- [x] Ícones de badge/som/skills aparecem e ficam nítidos
 - [ ] Tutorial, combo, near-miss, escudo da skill, sequência de morte
 - [ ] Controles de toque (mobile) e teclado
 - [x] Medir FPS com a skill `browser-perf` antes/depois (não pode cair)
@@ -863,6 +863,20 @@ Após a implementação (§7), verificar:
 > `shop-ascii` com as 2 frames de corrida diferentes do código (sprite ativo no preview);
 > `file://` com 80 frames, `grayCount` 0 e `erros: []`; FPS 53,3/60 (mesma faixa do
 > baseline 53,5–59,8, sem regressão).
+>
+> **Status pós-P15/P17 (13/11/2026):** raws corrigidos (`p15-ground-decor.png.jpg`,
+> `p17-ui-badges-speaker.png.jpg`, arte nova do Gemini) entram em `assets/raw-sprites/`;
+> spec INVENTORY na `sheet-tool.html` (p15: 5 frames; p17: 6 badges + 3 speakers) →
+> **94/94 frames, 0 warnings**. `ground-snow` entrou em `INV_FRAMES` (silhueta sólida
+> invertida, igual ao desenho antigo). Integração em `js/game.js`, tudo com fallback:
+> `drawGround` (stone/flower/mushroom/snow/pebbles na proporção da frame; r===19/33
+> continua em código — não há frame no P15), `drawSpeaker` (speaker-all/sfx/muted) e
+> tela BADGES (`BADGE_FRAMES` + ícone à direita da caixa usando `fr.w/fr.h` do manifesto).
+> Validação: `check.js` 20/20 shots + FPS 60,3; `filetest.js` `file://` 94 frames
+> `grayCount` 0 `erros: []`; `vis-test.js` 16/16 toggles 0 falhas; probe `drawImage`
+> (CDP) confirma os 14 frames novos desenhados nas posições esperadas (flor y=202,
+> pedra y=207, cogumelo y=209, neve y=213, sebes y=233; speaker 21/26/23 px; 6 badges
+> nos tamanhos exatos do manifesto) e fallback 404 → zero `drawImage`, `grayCount` 0.
 
 
 | # | Prompt | Frames | Qtd | Tamanho alvo (px) |
